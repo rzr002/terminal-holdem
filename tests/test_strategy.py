@@ -127,6 +127,79 @@ class StrategyTests(unittest.TestCase):
         nuts = self.river('As Ks', 'Qs Js Ts 2d 3c', call=50)
         self.assertIn(agent.decide(nuts, 'nova').action.kind, ['call', 'allin'])
 
+    def facing_open(self, raise_to=25, stack=1000):
+        hand = Hand([Player(str(i), stack) for i in range(9)], rng=random.Random(8))
+        hand.act(Action('raise', raise_to))
+        return hand.observation(hand.actor)
+
+    def test_every_role_continues_playable_hands_against_small_open(self):
+        for role in self.strategy().PROFILES[1:]:
+            for hole in ['9s 8s', '6c 6d', 'As 5s', 'Kh Td']:
+                with self.subTest(role=role.key, hole=hole):
+                    obs = self.facing_open()
+                    obs['hole'] = hole.split()
+                    action = agents.StrategicAgent(random.Random(3), samples=24).decide(obs, role.key).action
+                    self.assertIn(action.kind, ['call', 'raise'])
+
+    def test_playable_hands_can_limp_into_unraised_pot(self):
+        obs = self.view()
+        obs['hole'] = ['8s', '7s']
+        for role in self.strategy().PROFILES[1:]:
+            action = agents.StrategicAgent(random.Random(3), samples=24).decide(obs, role.key).action
+            self.assertIn(action.kind, ['call', 'raise'])
+
+    def test_small_price_guide_does_not_apply_to_big_bets_or_short_stack_commitments(self):
+        for obs in [self.facing_open(150), self.facing_open(25, stack=100)]:
+            obs['hole'] = ['9s', '8s']
+            info = self.strategy().analyze(obs, random.Random(3), samples=24)
+            self.assertIn('preflop_guide', info)
+            self.assertFalse(info['preflop_guide']['cheap_flop'])
+        big = self.facing_open(150)
+        big['hole'] = ['7c', '2d']
+        self.assertEqual(agents.StrategicAgent(random.Random(3), samples=24).decide(big, 'nova').action.kind, 'fold')
+
+    def test_equity_discloses_unacted_players_in_showdown_assumption(self):
+        info = self.strategy().analyze(self.view(), random.Random(3), samples=24)
+        self.assertIn('equity_scope', info)
+        self.assertIn('unacted', info['equity_scope'])
+        self.assertEqual(info['preflop_guide']['price_bb'], 1)
+
+    def test_repeated_shoves_widen_inferred_range_from_public_stats(self):
+        obs = self.facing_open(1000)
+        seat = obs['action_history'][-1]['seat']
+        before = self.strategy().range_weight(['7c', '2d'], obs, seat)
+        obs['opponent_stats'] = [{'seat': seat, 'hands': 4, 'shove_hands': 3}]
+        after = self.strategy().range_weight(['7c', '2d'], obs, seat)
+        self.assertGreater(after, before * 3)
+        info = self.strategy().analyze(obs, random.Random(1), samples=48)
+        self.assertIn('allin_defense', info)
+        self.assertEqual(info['allin_defense']['aggressor_seat'], seat)
+        self.assertTrue(info['allin_defense']['repeat_pressure'])
+        self.assertGreaterEqual(info['allin_defense']['equity_if_heads_up'], info['range_equity'])
+
+    def test_public_stats_count_shove_pressure_but_not_allin_calls(self):
+        hand = Hand([Player(str(i), 100) for i in range(3)], rng=random.Random(1))
+        hand.act(Action('allin'))
+        hand.act(Action('call'))
+        hand.act(Action('call'))
+        stats = self.strategy().PublicStats()
+        stats.record(hand.observation(0))
+        rows = stats.snapshot()
+        self.assertIn('shove_hands', rows[0])
+        self.assertEqual([row['shove_hands'] for row in rows], [1, 0, 0])
+
+    def test_program_calls_repeated_preflop_shove_with_queens_in_every_role(self):
+        hand = Hand([Player(str(i), 1000) for i in range(9)], rng=random.Random(1))
+        hand.act(Action('allin'))
+        for _ in range(7):
+            hand.act(Action('fold'))
+        obs = hand.observation(hand.actor)
+        obs['hole'] = ['Qs', 'Qh']
+        obs['opponent_stats'] = [{'seat': 3, 'hands': 4, 'shove_hands': 3}]
+        for profile in self.strategy().PROFILES[1:]:
+            decision = agents.StrategicAgent(random.Random(3), samples=64).decide(obs, profile.key)
+            self.assertIn(decision.action.kind, ['call', 'allin'])
+
     def test_program_provider_is_explicit_and_codex_remains_default(self):
         from holdem.__main__ import Application, parser
         self.assertIn('strategic', parser()._option_string_actions['--agent'].choices)

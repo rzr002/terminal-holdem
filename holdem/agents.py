@@ -133,6 +133,9 @@ class StrategicAgent:
         if obs['street'] == 'preflop' and any(p['stack'] > 0 for p in opponents):
             strength = info['preflop_strength']
             raises = info['preflop_raises']
+            guide = info['preflop_guide']
+            if guide['cheap_flop'] and guide['playable_for_small_price'] and strength < 0.82 - profile.aggression:
+                return Decision(Action('check' if 'check' in legal['actions'] else 'call'), 'strategic')
             if raises == 0:
                 thresholds = {'UTG': 0.67, 'UTG+1': 0.65, 'MP': 0.63, 'LJ': 0.61,
                               'HJ': 0.58, 'CO': 0.49, 'BTN': 0.43, 'SB': 0.48, 'BB': 0.57}
@@ -142,7 +145,7 @@ class StrategicAgent:
                 if can_raise:
                     limpers = sum(e['street'] == 'preflop' and e['action'] == 'call'
                                   for e in obs.get('action_history', []))
-                    target = obs['big_blind'] * (2.5 + limpers)
+                    target = obs['big_blind'] * (2.25 + min(0.75, limpers * 0.25))
                     if hero['stack'] <= 10 * obs['big_blind'] and strength >= 0.78:
                         target = legal['max_raise_to']
                     return raise_to(target)

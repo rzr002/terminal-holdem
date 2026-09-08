@@ -54,7 +54,7 @@ def frame_lines(hand, width, provider, autoplay, boss, status, height=None):
     rule = '─' * max(0, min(width - 4, 100))
     mode = 'AI 托管' if autoplay else '手动玩家'
     lines = ['  ♠  HOLD’EM     /     AFTER HOURS',
-             f'  {len(hand.players)} 人桌  ·  {provider}  ·  {mode}', '  ' + rule,
+             f'  {len(hand.players)} 人桌 · 活跃桌 · {provider} · {mode}', '  ' + rule,
              f'  HAND {hand.number:03d}     {STREET_NAMES[hand.street]}     盲注 {hand.small_blind}/{hand.big_blind}', '']
     board = hand.review_board if hand.done else hand.board
     supplemented = hand.done and len(hand.board) < 5

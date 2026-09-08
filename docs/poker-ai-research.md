@@ -24,7 +24,7 @@
 
 | 角色 | Skill | 决策侧重 |
 | --- | --- | --- |
-| NOVA | [poker-nova](../skills/poker-nova/SKILL.md) | 紧凶范围、价值建池、面对强行动的纪律 |
+| NOVA | [poker-nova](../skills/poker-nova/SKILL.md) | 活跃价值、小注宽入池、面对反复施压敢跟注 |
 | BLAZE | [poker-blaze](../skills/poker-blaze/SKILL.md) | 位置施压、偷盲、3-bet 与半诈唬 |
 | ECHO | [poker-echo](../skills/poker-echo/SKILL.md) | 混合线路、过牌范围保护、延迟下注 |
 | MOSS | [poker-moss](../skills/poker-moss/SKILL.md) | 深筹码、隐含赔率与坚果潜力 |
@@ -34,7 +34,7 @@
 | ORBIT | [poker-orbit](../skills/poker-orbit/SKILL.md) | 有效大盲、短筹码与边池资格 |
 | YOU 托管 | [poker-you](../skills/poker-you/SKILL.md) | 均衡决策；和对手一样独立竞争 |
 
-共享底座强调位置、多人底池、有效筹码、权益实现率，以及价值下注与诈唬的区别。赔率与多人底池的实战背景参考 [PokerStars 赔率教程](https://www.pokerstars.com/poker/learn/lesson/pot-odds/)和[多人底池说明](https://www.pokerstars.com/poker/learn/strategies/a-guide-to-multiway-pots/)。具体角色偏好、程序阈值和范围权重是本项目设计的启发式，不是从求解器导出的图表。
+共享底座采用用户选择的活跃休闲桌偏好：允许平跟和更多便宜看翻牌，仍区分价值下注、诈唬及全押防守。赔率与多人底池的实战背景参考 [PokerStars 赔率教程](https://www.pokerstars.com/poker/learn/lesson/pot-odds/)和[多人底池说明](https://www.pokerstars.com/poker/learn/strategies/a-guide-to-multiway-pots/)。具体角色偏好、程序阈值和范围权重是本项目设计的启发式，不是从求解器导出的图表。
 
 ### 概率与公开统计
 
@@ -42,6 +42,8 @@
 - 分层计算当前跟注后有资格争夺的主池与边池；不能将其他玩家的深筹码边池算作自己的回报。
 - 输出位置、剩余有效筹码、SPR、听牌提示和合法下注总额候选。辅助计算只接收当前座位观察，不接触发牌器、未来牌或其他底牌。
 - 在本次运行中累积公开 VPIP、PFR、面对下注的弃牌率和翻牌后激进因子。每次向模型提供样本数，skill 要求小样本时保持谨慎；退出后不保存。
+- 单独记录主动全押手数，排除跟注至全押。至少观察三手、其中主动全押至少两手且比例不低于 40% 时，给对手当前全押范围加入更宽的组合权重，并提示模型扩大合理跟注。保留价值组合，不把频繁全押当作已知诈唬。
+- 提供便宜看翻牌指引与全押者单挑权益；明确未行动者不一定会跟注，不能拿“全部人都摊牌”的低权益机械否定可玩起手牌。
 
 范围采样有每位对手 12 次拒绝采样的上限，因此只是近似分布。胜率和跟注收益不模拟未来下注或精确弃牌率；范围权重、权益实现率折扣也未经训练。补牌和结束后亮出的其他底牌不会进入统计。
 
@@ -79,6 +81,16 @@ python3 scripts/check_strategy_codex.py
 | [独立牌堆复测](../validation/strategic-benchmark-holdout.json) | 参数未调整；200 组新牌堆 × 9 个座位，共 1,800 手；+58.28 bb/100，近似区间 [−29.74, 146.30] | 均值为正，但区间仍包含零，尚不能确认稳定强于旧 local |
 
 两轮比较双方每次都使用 64 次抽样，游戏默认是 192 次。程序版结果不能替代 Codex skill 版本的强度评测，也不能外推到真实玩家或正式赛事。
+
+### 活跃桌调整后的检查
+
+上述强度比较是调整前版本的历史记录。用户随后选择更活跃、对反复全押有更多防守的桌风；这一目标不等于最大化对旧基线的收益。
+
+使用相同 60 组牌堆、每次 48 次抽样，对九个程序座位仅跑翻牌前，主动入池比例从 15.19% 增至 41.11%；进入翻牌的手数从 25/60 增至 60/60，有翻牌时的平均人数从 2.16 增至 4.15。详见[调整前](../validation/table-activity-before.json)和[调整后](../validation/table-activity-after.json)。这是固定样本的活动度比较，不保证每手都有多人跟注，也不代表 Codex 的实测入池率。
+
+`python3 scripts/check_table_style_codex.py` 使用真实 Codex 检查八位角色的便宜入池或反复全押防守场景，并额外检查垃圾牌仍能弃掉；运行会使用账户额度。
+
+本次九项真实模型检查全部通过：NOVA、BLAZE、ECHO、MOSS 分别用 98s、KTo、66、A5s 跟小开池；ATLAS、JADE、RAVEN、ORBIT 分别用 AQs、JJ、KQs、99 跟反复全押者；NOVA 的 72o 仍弃牌。记录见 [Codex 活跃桌场景检查](../validation/codex-table-style-smoke.json)。这些是指定局面的单次响应，不代表长期跟注频率。另有 66 项本地自动测试通过。
 
 ## 若继续做强化学习版
 

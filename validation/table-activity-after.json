@@ -1,0 +1,11 @@
+{
+  "source": "strategic / all seats",
+  "deals": 60,
+  "samples": 48,
+  "deal_seeds": "9000..9059",
+  "vpip_pct": 41.11,
+  "hands_reaching_flop": 60,
+  "mean_players_at_flop": 4.15,
+  "preflop_actions": 583,
+  "note": "Deterministic program-table activity check, not a Codex participation guarantee."
+}

@@ -23,14 +23,14 @@ class Profile:
 
 PROFILES = (
     Profile('you', 'YOU', '均衡', 'balanced'),
-    Profile('nova', 'NOVA', '紧凶', 'tight', -0.03, -0.02, 0.02),
-    Profile('blaze', 'BLAZE', '施压', 'aggressive', 0.02, 0.06, 0.06),
-    Profile('echo', 'ECHO', '混合', 'tricky', 0.01, 0.02, 0.05),
-    Profile('moss', 'MOSS', '深筹', 'loose', 0.02, 0, 0.02),
-    Profile('atlas', 'ATLAS', '均衡', 'balanced', 0, 0, 0.03),
-    Profile('jade', 'JADE', '读人', 'tight', -0.01, 0.01, 0.03),
-    Profile('raven', 'RAVEN', '阻断', 'aggressive', 0.01, 0.04, 0.05),
-    Profile('orbit', 'ORBIT', '短筹', 'tricky', 0, 0.02, 0.03),
+    Profile('nova', 'NOVA', '价值', 'tight', 0.06, -0.02, 0.03),
+    Profile('blaze', 'BLAZE', '施压', 'aggressive', 0.10, 0.06, 0.08),
+    Profile('echo', 'ECHO', '混合', 'tricky', 0.09, 0.02, 0.07),
+    Profile('moss', 'MOSS', '深筹', 'loose', 0.12, 0, 0.04),
+    Profile('atlas', 'ATLAS', '均衡', 'balanced', 0.07, 0, 0.04),
+    Profile('jade', 'JADE', '读人', 'tight', 0.08, 0.01, 0.05),
+    Profile('raven', 'RAVEN', '阻断', 'aggressive', 0.09, 0.04, 0.07),
+    Profile('orbit', 'ORBIT', '短筹', 'tricky', 0.07, 0.02, 0.05),
 )
 
 
@@ -67,6 +67,36 @@ def preflop_strength(hole):
     score += (hole[0][1] == hole[1][1]) * 0.08
     score += 0.07 if hi - lo == 1 else (0.02 if hi - lo == 2 else 0)
     return min(1, score)
+
+
+def preflop_guide(obs):
+    """An explicit recreational preference for affordable, playable starting hands."""
+    hi, lo = sorted((RANKS.index(c[0]) + 2 for c in obs['hole']), reverse=True)
+    suited = obs['hole'][0][1] == obs['hole'][1][1]
+    late = positions(obs).get(obs['seat']) in ('HJ', 'CO', 'BTN', 'SB', 'BB')
+    playable = (hi == lo or lo >= 10 or (suited and (hi >= 10 or (hi >= 5 and hi - lo <= 2)))
+                or (hi == 14 and (lo >= 7 or late)) or (late and hi >= 9 and hi - lo <= 2)
+                or (late and hi == 13 and lo >= 9))
+    hero = obs['players'][obs['seat']]
+    opponents = [p for p in obs['players'] if p['seat'] != obs['seat'] and not p['folded']]
+    effective = min(hero['stack'] + hero['bet'], max((p['stack'] + p['bet'] for p in opponents), default=0))
+    cost, blind = obs['legal'].get('to_call', 0), obs['big_blind']
+    raises = sum(e['street'] == 'preflop' and e['action'] == 'raise' for e in obs.get('action_history', []))
+    cheap = (obs['street'] == 'preflop' and raises <= 1 and obs['current_bet'] <= 3 * blind
+             and cost <= min(3 * blind, effective * 0.08) and effective >= 20 * blind
+             and any(p['stack'] > 0 for p in opponents))
+    return {'table_style': 'relaxed', 'price_bb': round(cost / blind, 2),
+            'effective_stack_bb': round(effective / blind, 2),
+            'cheap_flop': cheap, 'playable_for_small_price': playable,
+            'preference': 'For cheap playable hands, prefer seeing the flop via call or a small raise. '
+                          'This recreational preference is not an EV guarantee; large raises and shoves need separate evaluation.'}
+
+
+def _shove_read(obs, seat):
+    stats = next((row for row in obs.get('opponent_stats', []) if row['seat'] == seat), {})
+    hands, shoves = stats.get('hands', 0), stats.get('shove_hands', 0)
+    repeat = hands >= 3 and shoves >= 2 and shoves / hands >= 0.4
+    return {'observed_hands': hands, 'shove_hands': shoves, 'repeat_pressure': repeat}
 
 
 def has_draw(hole, board):
@@ -112,6 +142,12 @@ def range_weight(hole, obs, seat):
         if event['action'] == 'raise' and category == 0 and not made_or_draw:
             likelihood = 0.07
         weight *= likelihood
+    read = _shove_read(obs, seat)
+    if read['repeat_pressure'] and any(e['action'] == 'raise' and e.get('all_in') for e in events):
+        # Repeated public shove pressure is evidence for a wider range, not proof
+        # of a bluff. Mix in broad combinations while retaining a value component.
+        broad_mass = min(0.7, read['shove_hands'] / (read['shove_hands'] + 3))
+        weight = weight * (1 - broad_mass) + broad_mass
     return max(0.02, weight)
 
 
@@ -141,7 +177,11 @@ def analyze(obs, rng, samples=192, cancel=None):
     cost = obs['legal'].get('to_call', 0)
     pots = _eligible_pots(obs, cost)
     contestable = sum(amount for amount, _ in pots)
-    equity = payout = 0.0
+    events = obs.get('action_history', [])
+    last_raise = next((e for e in reversed(events) if e['street'] == obs['street'] and e['action'] == 'raise'), None)
+    shover = (last_raise['seat'] if cost and last_raise and last_raise.get('all_in')
+              and last_raise['seat'] in opponents else None)
+    equity = payout = duel_equity = 0.0
     # Cache weights for sampled combinations within this decision only.
     weights = {}
     for _ in range(samples):
@@ -167,6 +207,8 @@ def analyze(obs, rng, samples=192, cancel=None):
         board = obs['board'] + rng.sample(remaining, 5 - len(obs['board']))
         scores = {seat: evaluate(obs['hole'] + board)}
         scores.update({other: evaluate(pair + board) for other, pair in holes.items()})
+        if shover is not None:
+            duel_equity += 1 if scores[seat] > scores[shover] else (0.5 if scores[seat] == scores[shover] else 0)
         best = max(scores.values())
         if scores[seat] == best:
             equity += 1 / sum(score == best for score in scores.values())
@@ -185,12 +227,22 @@ def analyze(obs, rng, samples=192, cancel=None):
         for label, fraction in [('small', 0.33), ('half', 0.5), ('large', 0.75), ('pot', 1)]:
             target = obs['current_bet'] + max(obs['big_blind'], round((obs['pot'] + cost) * fraction))
             sizes[label] = min(legal['max_raise_to'], max(legal['min_raise_to'], target))
-    events = obs.get('action_history', [])
+    defense = None
+    if shover is not None:
+        defense = {'aggressor_seat': shover, **_shove_read(obs, shover),
+                   'equity_if_heads_up': round(duel_equity / samples, 5),
+                   'other_live_opponents': len(opponents) - 1,
+                   'guidance': 'All-in does not prove a premium hand. Compare price and credible ranges; '
+                               'repeated shoves justify wider value calls and bluff catches. '
+                               'Heads-up equity assumes everyone except this shover folds.'}
     return {'position': positions_by_seat.get(seat, 'unknown'),
             'in_position_postflop': after_button[-1] == seat,
             'live_opponents': len(opponents), 'preflop_strength': round(preflop_strength(obs['hole']), 4),
             'range_equity': round(equity / samples, 5), 'equity_samples': samples,
             'equity_model': 'heuristic action-weighted ranges; bounded Monte Carlo; not GTO',
+            'equity_scope': 'Showdown against ALL non-folded players, including unacted players. '
+                            'This is not an opening/calling threshold before anyone has acted.',
+            'preflop_guide': preflop_guide(obs), 'allin_defense': defense,
             'eligible_pot_after_call': contestable, 'pot_odds': round(cost / max(1, contestable), 5),
             'call_ev_chips': round(payout / samples - cost, 2),
             'effective_stack_after_call': effective, 'spr': round(effective / max(1, contestable), 2),
@@ -199,7 +251,8 @@ def analyze(obs, rng, samples=192, cancel=None):
             'raises_this_street': sum(e['action'] == 'raise' and e['street'] == obs['street'] for e in events),
             'bet_sizes_raise_to': sizes,
             'caveat': 'Call EV assumes no more betting; ranges and future folds are not solved. '
-                      'Use stronger ranges and equity-realization discounts when facing pressure.'}
+                      'Do not mechanically fold cheap playable preflop hands using all-player equity. '
+                      'Evaluate shove size and observed pressure before assigning a narrow range.'}
 
 
 class PublicStats:
@@ -218,6 +271,7 @@ class PublicStats:
             row['hands'] += 1
             row['vpip'] += any(e['street'] == 'preflop' and e['paid'] > 0 for e in events)
             row['pfr'] += any(e['street'] == 'preflop' and e['action'] == 'raise' for e in events)
+            row['shove_hands'] += any(e['action'] == 'raise' and e.get('all_in') for e in events)
             faced = [e for e in events if e['to_call_before'] > 0]
             row['faced_bets'] += len(faced)
             row['folds'] += sum(e['action'] == 'fold' for e in faced)
@@ -226,6 +280,7 @@ class PublicStats:
 
     def snapshot(self):
         return [{'seat': seat, 'hands': row['hands'],
+                 'shove_hands': row['shove_hands'],
                  'vpip_pct': round(100 * row['vpip'] / row['hands'], 1),
                  'pfr_pct': round(100 * row['pfr'] / row['hands'], 1),
                  'faced_bets': row['faced_bets'],

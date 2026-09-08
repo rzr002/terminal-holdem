@@ -1,0 +1,123 @@
+{
+  "model": "gpt-6-astra",
+  "cases": [
+    {
+      "case": "cheap_flop",
+      "role": "nova",
+      "hole": [
+        "9s",
+        "8s"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex",
+      "passed": true,
+      "elapsed_seconds": 10.7
+    },
+    {
+      "case": "cheap_flop",
+      "role": "blaze",
+      "hole": [
+        "Kh",
+        "Td"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex",
+      "passed": true,
+      "elapsed_seconds": 8.97
+    },
+    {
+      "case": "cheap_flop",
+      "role": "echo",
+      "hole": [
+        "6c",
+        "6d"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex",
+      "passed": true,
+      "elapsed_seconds": 8.55
+    },
+    {
+      "case": "cheap_flop",
+      "role": "moss",
+      "hole": [
+        "As",
+        "5s"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex",
+      "passed": true,
+      "elapsed_seconds": 9.38
+    },
+    {
+      "case": "repeat_shove_defense",
+      "role": "atlas",
+      "hole": [
+        "As",
+        "Qs"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex",
+      "passed": true,
+      "elapsed_seconds": 9.45
+    },
+    {
+      "case": "repeat_shove_defense",
+      "role": "jade",
+      "hole": [
+        "Jc",
+        "Jh"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex",
+      "passed": true,
+      "elapsed_seconds": 10.13
+    },
+    {
+      "case": "repeat_shove_defense",
+      "role": "raven",
+      "hole": [
+        "Kh",
+        "Qh"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex",
+      "passed": true,
+      "elapsed_seconds": 11.57
+    },
+    {
+      "case": "repeat_shove_defense",
+      "role": "orbit",
+      "hole": [
+        "9c",
+        "9d"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex",
+      "passed": true,
+      "elapsed_seconds": 9.5
+    },
+    {
+      "case": "repeat_shove_trash",
+      "role": "nova",
+      "hole": [
+        "7c",
+        "2d"
+      ],
+      "action": "fold",
+      "amount": 0,
+      "source": "codex",
+      "passed": true,
+      "elapsed_seconds": 9.31
+    }
+  ],
+  "scope": "Synthetic decisions using real Codex; verifies selected behaviors, not full-game frequencies."
+}

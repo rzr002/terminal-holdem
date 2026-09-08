@@ -68,6 +68,7 @@ prompt = sys.stdin.read()
 assert 'poker-core' in prompt and 'poker-nova' in prompt
 analysis = json.loads(prompt.split('STRATEGY_ANALYSIS:\\n')[1].split('\\nOBSERVATION:')[0])
 assert 'range_equity' in analysis and 'pot_odds' in analysis
+assert analysis['preflop_guide']['table_style'] == 'relaxed'
 obs = json.loads(prompt.split('OBSERVATION:\\n')[1])
 assert all('hole' not in p for p in obs['players'])
 assert 'deck' not in obs and 'review_board' not in obs
