@@ -1,0 +1,29 @@
+{
+  "hands_played": 1,
+  "players": [
+    {
+      "name": "YOU",
+      "stack": 0
+    },
+    {
+      "name": "NOVA",
+      "stack": 30
+    },
+    {
+      "name": "BLAZE",
+      "stack": 90
+    },
+    {
+      "name": "ECHO",
+      "stack": 40
+    }
+  ],
+  "unsettled_pot": 0,
+  "decisions": {
+    "codex": 4
+  },
+  "agent": "CODEX / gpt-6-astra",
+  "error": "",
+  "elapsed_seconds": 41.72,
+  "validation": "Real Codex CLI; default settings; four AI seats; no local strategy"
+}

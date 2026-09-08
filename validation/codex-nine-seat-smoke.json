@@ -1,0 +1,49 @@
+{
+  "hands_played": 1,
+  "players": [
+    {
+      "name": "YOU",
+      "stack": 40
+    },
+    {
+      "name": "NOVA",
+      "stack": 80
+    },
+    {
+      "name": "BLAZE",
+      "stack": 20
+    },
+    {
+      "name": "ECHO",
+      "stack": 40
+    },
+    {
+      "name": "MOSS",
+      "stack": 20
+    },
+    {
+      "name": "ATLAS",
+      "stack": 40
+    },
+    {
+      "name": "JADE",
+      "stack": 40
+    },
+    {
+      "name": "RAVEN",
+      "stack": 40
+    },
+    {
+      "name": "ORBIT",
+      "stack": 40
+    }
+  ],
+  "unsettled_pot": 0,
+  "decisions": {
+    "codex": 18
+  },
+  "agent": "CODEX / gpt-6-astra",
+  "error": "",
+  "elapsed_seconds": 168.54,
+  "validation": "Real Codex CLI; default nine-seat table; one completed hand; no local strategy"
+}
