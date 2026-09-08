@@ -14,7 +14,7 @@ import tomllib
 import urllib.request
 
 from .engine import Action, DECK, evaluate
-from .strategy import analyze, profile_for, skill_text
+from .strategy import analyze, preflop_guide, profile_for, skill_text
 
 SCHEMA = {
     'type': 'object',
@@ -71,6 +71,19 @@ def parse_decision(data, obs):
     return Action(kind, amount if kind == 'raise' else 0)
 
 
+def flop_first_observation(obs):
+    """Restrict automated seats to the chosen table style; preserve manual rules."""
+    guide = preflop_guide(obs)
+    if not guide['cheap_flop']:
+        return obs
+    legal = dict(obs['legal'])
+    legal['actions'] = [a for a in legal['actions'] if a not in ('fold', 'allin')]
+    legal['max_raise_to'] = min(legal['max_raise_to'], guide['open_raise_cap'])
+    if legal['max_raise_to'] < legal['min_raise_to']:
+        legal['actions'] = [a for a in legal['actions'] if a != 'raise']
+    return {**obs, 'legal': legal}
+
+
 class LocalAgent:
     def __init__(self, rng=None, samples=64):
         self.rng = rng or random.Random()
@@ -119,6 +132,7 @@ class StrategicAgent:
         self.samples = samples
 
     def decide(self, obs, personality='balanced', cancel=None):
+        obs = flop_first_observation(obs)
         info = analyze(obs, self.rng, samples=self.samples, cancel=cancel)
         profile = profile_for(personality)
         legal = obs['legal']
@@ -134,7 +148,9 @@ class StrategicAgent:
             strength = info['preflop_strength']
             raises = info['preflop_raises']
             guide = info['preflop_guide']
-            if guide['cheap_flop'] and guide['playable_for_small_price'] and strength < 0.82 - profile.aggression:
+            if guide['cheap_flop']:
+                if can_raise and strength >= 0.82 - profile.aggression:
+                    return raise_to(2.5 * obs['big_blind'])
                 return Decision(Action('check' if 'check' in legal['actions'] else 'call'), 'strategic')
             if raises == 0:
                 thresholds = {'UTG': 0.67, 'UTG+1': 0.65, 'MP': 0.63, 'LJ': 0.61,
@@ -206,6 +222,7 @@ class CodexAgent:
     def decide(self, obs, personality='balanced', cancel=None):
         if cancel and cancel.is_set():
             raise InterruptedError('已取消')
+        obs = flop_first_observation(obs)
         instructions = skill_text(personality)
         analysis = analyze(obs, self.rng, cancel=cancel)
         analysis['mix_roll'] = round(self.rng.random(), 5)
@@ -222,7 +239,11 @@ class CodexAgent:
         with tempfile.TemporaryDirectory(prefix='holdem-agent-') as folder:
             schema = Path(folder) / 'schema.json'
             output = Path(folder) / 'decision.json'
-            schema.write_text(json.dumps(SCHEMA), encoding='utf-8')
+            decision_schema = {**SCHEMA, 'properties': {**SCHEMA['properties'],
+                'action': {'type': 'string', 'enum': obs['legal']['actions']},
+                'amount': {'type': 'integer', 'minimum': 0,
+                           'maximum': obs['legal']['max_raise_to'] if 'raise' in obs['legal']['actions'] else 0}}}
+            schema.write_text(json.dumps(decision_schema), encoding='utf-8')
             prompt_file = Path(folder) / 'prompt.txt'
             prompt_file.write_text(prompt, encoding='utf-8')
             command = [self.binary, '-a', 'never', 'exec', '--ignore-user-config',

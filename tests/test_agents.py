@@ -1,4 +1,5 @@
 from pathlib import Path
+import copy
 import random
 import sys
 import tempfile
@@ -68,7 +69,7 @@ prompt = sys.stdin.read()
 assert 'poker-core' in prompt and 'poker-nova' in prompt
 analysis = json.loads(prompt.split('STRATEGY_ANALYSIS:\\n')[1].split('\\nOBSERVATION:')[0])
 assert 'range_equity' in analysis and 'pot_odds' in analysis
-assert analysis['preflop_guide']['table_style'] == 'relaxed'
+assert analysis['preflop_guide']['table_style'] == 'flop_first'
 obs = json.loads(prompt.split('OBSERVATION:\\n')[1])
 assert all('hole' not in p for p in obs['players'])
 assert 'deck' not in obs and 'review_board' not in obs
@@ -76,6 +77,60 @@ Path(sys.argv[sys.argv.index('-o') + 1]).write_text('{"action":"call","amount":0
 ''')
             decision = CodexAgent(binary=binary, timeout=3).decide(self.view(), 'nova')
             self.assertEqual(decision.source, 'codex')
+
+    def test_codex_cheap_preflop_schema_excludes_fold_and_shove_without_mutating_hand(self):
+        obs = self.view()
+        obs['hole'] = ['7c', '2d']
+        before = copy.deepcopy(obs)
+        with tempfile.TemporaryDirectory() as folder:
+            binary = self.executable(folder, '''import sys, json
+from pathlib import Path
+prompt = sys.stdin.read()
+obs = json.loads(prompt.split('OBSERVATION:\\n')[1])
+schema = json.loads(Path(sys.argv[sys.argv.index('--output-schema')+1]).read_text())
+assert set(schema['properties']['action']['enum']) == {'call', 'raise'}
+assert obs['legal']['actions'] == ['call', 'raise']
+assert obs['legal']['max_raise_to'] == 3 * obs['big_blind']
+assert schema['properties']['amount']['maximum'] == obs['legal']['max_raise_to']
+Path(sys.argv[sys.argv.index('-o')+1]).write_text('{"action":"call","amount":0}')
+''')
+            decision = CodexAgent(binary=binary, timeout=3).decide(obs, 'nova')
+            self.assertEqual(decision.action, Action('call'))
+            self.assertEqual(decision.source, 'codex')
+        self.assertEqual(obs, before)
+        self.assertIn('fold', obs['legal']['actions'])  # Manual player retains normal rules.
+
+    def test_codex_cannot_silently_turn_a_forbidden_fold_into_a_call(self):
+        with tempfile.TemporaryDirectory() as folder:
+            binary = self.executable(folder, '''import sys
+from pathlib import Path
+Path(sys.argv[sys.argv.index('-o')+1]).write_text('{"action":"fold","amount":0}')
+''')
+            with self.assertRaises(ValueError):
+                CodexAgent(binary=binary, timeout=3).decide(self.view(), 'nova')
+
+    def test_codex_can_fold_after_flop_or_when_preflop_price_is_high(self):
+        views = []
+        for raise_to, stack in [(70, 1000), (25, 100), (1000, 1000)]:
+            hand = Hand([Player(str(i), stack) for i in range(9)], rng=random.Random(1))
+            hand.act(Action('raise', raise_to))
+            views.append(hand.observation(hand.actor))
+        hand = Hand([Player(str(i), 1000) for i in range(9)], rng=random.Random(2))
+        while hand.street == 'preflop':
+            hand.act(Action('check' if 'check' in hand.legal()['actions'] else 'call'))
+        hand.act(Action('raise', 10))
+        views.append(hand.observation(hand.actor))
+        with tempfile.TemporaryDirectory() as folder:
+            binary = self.executable(folder, '''import sys, json
+from pathlib import Path
+schema = json.loads(Path(sys.argv[sys.argv.index('--output-schema')+1]).read_text())
+assert 'fold' in schema['properties']['action']['enum']
+Path(sys.argv[sys.argv.index('-o')+1]).write_text('{"action":"fold","amount":0}')
+''')
+            for obs in views:
+                with self.subTest(street=obs['street'], price=obs['legal']['to_call']):
+                    decision = CodexAgent(binary=binary, timeout=3).decide(obs, 'nova')
+                    self.assertEqual(decision.action, Action('fold'))
 
     def test_system_proxy_is_passed_to_codex_without_changing_parent_environment(self):
         import os

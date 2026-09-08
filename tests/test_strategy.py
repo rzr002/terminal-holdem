@@ -110,14 +110,45 @@ class StrategyTests(unittest.TestCase):
         self.assertEqual(rows[2]['vpip_pct'], 0)
         self.assertTrue(all('hole' not in row and 'board' not in row for row in rows))
 
-    def test_program_folds_early_position_trash_and_raises_aces(self):
+    def test_program_sees_flop_with_early_position_trash_and_small_raises_aces(self):
         self.assertTrue(hasattr(agents, 'StrategicAgent'), 'Program opponent is missing')
         obs = self.view()
-        for hole, expected in [('7c 2d', 'fold'), ('As Ah', 'raise')]:
+        for hole, expected in [('7c 2d', 'call'), ('As Ah', 'raise')]:
             with self.subTest(hole=hole):
                 obs['hole'] = hole.split()
                 action = agents.StrategicAgent(random.Random(2), samples=48).decide(obs, 'nova').action
                 self.assertEqual(action.kind, expected)
+                if action.kind == 'raise':
+                    self.assertLessEqual(action.amount, 3 * obs['big_blind'])
+
+    def test_all_roles_continue_weak_hands_up_to_six_big_blinds(self):
+        for role in self.strategy().PROFILES:
+            for amount in (25, 60):
+                obs = self.facing_open(amount)
+                obs['hole'] = ['7c', '2d']
+                with self.subTest(role=role.key, amount=amount):
+                    action = agents.StrategicAgent(random.Random(3), samples=12).decide(obs, role.key).action
+                    self.assertEqual(action, Action('call'))
+
+    def test_cheap_preflop_does_not_start_a_reraise_war(self):
+        obs = self.facing_open()
+        obs['hole'] = ['As', 'Ah']
+        for role in self.strategy().PROFILES:
+            action = agents.StrategicAgent(random.Random(3), samples=12).decide(obs, role.key).action
+            self.assertEqual(action, Action('call'))
+
+    def test_whole_program_table_reaches_flop_without_preflop_folds(self):
+        for seed in range(12):
+            hand = Hand([Player(str(i), 2000) for i in range(9)],
+                        small_blind=10, big_blind=20, rng=random.Random(seed))
+            agent = agents.StrategicAgent(random.Random(seed), samples=8)
+            while not hand.done and hand.street == 'preflop':
+                role = self.strategy().PROFILES[hand.actor].key
+                hand.act(agent.decide(hand.observation(hand.actor), role).action)
+            self.assertEqual(hand.street, 'flop')
+            self.assertEqual(len(hand.board), 3)
+            self.assertEqual(len(hand.live()), 9)
+            self.assertEqual(sum(p.stack for p in hand.players) + hand.pot, 18000)
 
     def test_program_never_folds_free_action_or_unbeatable_hand(self):
         self.assertTrue(hasattr(agents, 'StrategicAgent'), 'Program opponent is missing')

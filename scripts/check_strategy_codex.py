@@ -13,7 +13,7 @@ from holdem.engine import Hand, Player
 
 def main():
     cases = []
-    for name, role, hole, expected in [('early_trash', 'nova', ['7c', '2d'], ['fold']),
+    for name, role, hole, expected in [('cheap_trash_sees_flop', 'nova', ['7c', '2d'], ['call', 'raise']),
                                        ('early_aces', 'blaze', ['As', 'Ah'], ['raise'])]:
         hand = Hand([Player(f'P{i}', 1000) for i in range(9)], rng=random.Random(1))
         obs = hand.observation(hand.actor)

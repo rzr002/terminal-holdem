@@ -70,26 +70,24 @@ def preflop_strength(hole):
 
 
 def preflop_guide(obs):
-    """An explicit recreational preference for affordable, playable starting hands."""
-    hi, lo = sorted((RANKS.index(c[0]) + 2 for c in obs['hole']), reverse=True)
-    suited = obs['hole'][0][1] == obs['hole'][1][1]
-    late = positions(obs).get(obs['seat']) in ('HJ', 'CO', 'BTN', 'SB', 'BB')
-    playable = (hi == lo or lo >= 10 or (suited and (hi >= 10 or (hi >= 5 and hi - lo <= 2)))
-                or (hi == 14 and (lo >= 7 or late)) or (late and hi >= 9 and hi - lo <= 2)
-                or (late and hi == 13 and lo >= 9))
+    """The user's flop-first table preference, bounded by total preflop cost."""
     hero = obs['players'][obs['seat']]
     opponents = [p for p in obs['players'] if p['seat'] != obs['seat'] and not p['folded']]
     effective = min(hero['stack'] + hero['bet'], max((p['stack'] + p['bet'] for p in opponents), default=0))
     cost, blind = obs['legal'].get('to_call', 0), obs['big_blind']
-    raises = sum(e['street'] == 'preflop' and e['action'] == 'raise' for e in obs.get('action_history', []))
-    cheap = (obs['street'] == 'preflop' and raises <= 1 and obs['current_bet'] <= 3 * blind
-             and cost <= min(3 * blind, effective * 0.08) and effective >= 20 * blind
+    raises = [e for e in obs.get('action_history', []) if e['street'] == 'preflop' and e['action'] == 'raise']
+    budget = min(6 * blind, int(effective * 0.12))
+    facing_shove = bool(raises and raises[-1].get('all_in'))
+    cheap = (obs['street'] == 'preflop' and obs['current_bet'] <= budget
+             and cost < hero['stack'] and effective >= 20 * blind and not facing_shove
              and any(p['stack'] > 0 for p in opponents))
-    return {'table_style': 'relaxed', 'price_bb': round(cost / blind, 2),
+    return {'table_style': 'flop_first', 'price_bb': round(cost / blind, 2),
             'effective_stack_bb': round(effective / blind, 2),
-            'cheap_flop': cheap, 'playable_for_small_price': playable,
-            'preference': 'For cheap playable hands, prefer seeing the flop via call or a small raise. '
-                          'This recreational preference is not an EV guarantee; large raises and shoves need separate evaluation.'}
+            'cheap_flop': cheap, 'continue_with_any_hand': cheap,
+            'preflop_budget': budget, 'open_raise_cap': min(3 * blind, budget) if not raises else 0,
+            'preference': 'When cheap_flop is true, see three board cards with ANY starting hand, including 72o. '
+                          'Choose only the provided actions; no folding, shoving or reraising in this affordable phase. '
+                          'After the flop or against expensive bets/shoves, evaluate the hand normally.'}
 
 
 def _shove_read(obs, seat):

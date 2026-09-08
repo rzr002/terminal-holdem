@@ -34,7 +34,7 @@
 | ORBIT | [poker-orbit](../skills/poker-orbit/SKILL.md) | 有效大盲、短筹码与边池资格 |
 | YOU 托管 | [poker-you](../skills/poker-you/SKILL.md) | 均衡决策；和对手一样独立竞争 |
 
-共享底座采用用户选择的活跃休闲桌偏好：允许平跟和更多便宜看翻牌，仍区分价值下注、诈唬及全押防守。赔率与多人底池的实战背景参考 [PokerStars 赔率教程](https://www.pokerstars.com/poker/learn/lesson/pot-odds/)和[多人底池说明](https://www.pokerstars.com/poker/learn/strategies/a-guide-to-multiway-pots/)。具体角色偏好、程序阈值和范围权重是本项目设计的启发式，不是从求解器导出的图表。
+共享底座采用用户选择的“先看翻牌”偏好：便宜翻前任何两张都继续，三张公共牌出现后再按角色策略判断，仍区分价值下注、诈唬及全押防守。赔率与多人底池的实战背景参考 [PokerStars 赔率教程](https://www.pokerstars.com/poker/learn/lesson/pot-odds/)和[多人底池说明](https://www.pokerstars.com/poker/learn/strategies/a-guide-to-multiway-pots/)。具体桌风、程序阈值和范围权重是本项目设计的启发式，不是从求解器导出的图表。
 
 ### 概率与公开统计
 
@@ -72,7 +72,7 @@ python3 scripts/check_strategy_codex.py
 
 程序评测按独立牌堆汇总各座位轮换收益，再报告 bb/100 与近似区间，避免把同一牌堆的多次轮换当作独立样本。小样本、单一基线和同一组参数均限制结论；不能用短期赢筹码证明“专业级”。真实模型检查只确认明显场景与接入链路，没有衡量复杂牌局下的长期强度。
 
-本次结果：
+历史验证结果（加入“先看翻牌”约束之前）：
 
 | 检查 | 结果 | 可得结论 |
 | --- | --- | --- |
@@ -82,7 +82,7 @@ python3 scripts/check_strategy_codex.py
 
 两轮比较双方每次都使用 64 次抽样，游戏默认是 192 次。程序版结果不能替代 Codex skill 版本的强度评测，也不能外推到真实玩家或正式赛事。
 
-### 活跃桌调整后的检查
+### 第一轮活跃桌调整后的检查
 
 上述强度比较是调整前版本的历史记录。用户随后选择更活跃、对反复全押有更多防守的桌风；这一目标不等于最大化对旧基线的收益。
 
@@ -91,6 +91,18 @@ python3 scripts/check_strategy_codex.py
 `python3 scripts/check_table_style_codex.py` 使用真实 Codex 检查八位角色的便宜入池或反复全押防守场景，并额外检查垃圾牌仍能弃掉；运行会使用账户额度。
 
 本次九项真实模型检查全部通过：NOVA、BLAZE、ECHO、MOSS 分别用 98s、KTo、66、A5s 跟小开池；ATLAS、JADE、RAVEN、ORBIT 分别用 AQs、JJ、KQs、99 跟反复全押者；NOVA 的 72o 仍弃牌。记录见 [Codex 活跃桌场景检查](../validation/codex-table-style-smoke.json)。这些是指定局面的单次响应，不代表长期跟注频率。另有 66 项本地自动测试通过。
+
+### 第二轮：先看翻牌
+
+用户进一步要求首轮尽量不弃牌，看到三张公共牌再判断。现在 `preflop_guide` 不再按起手牌筛选：有效筹码至少 20 BB、整轮下注不超过 6 BB 且不超过有效筹码 12%、跟注不会耗尽自身筹码且未面对主动全押时，自动牌手进入先看翻牌阶段。
+
+`flop_first_observation()` 为自动牌手生成局部动作约束，移除弃牌与全押；未开池的加注上限为 3 BB，已有加注则只跟注或过牌。Codex 使用同样受限的观察和 JSON Schema，返回动作仍经过校验；违反约束时报告错误，不偷偷改成跟注。程序版也使用这一约束。手动玩家和结算引擎的扑克规则保持原样。
+
+三张公共牌出现、成本超过预算、面对主动全押或短筹码承诺时解除这一限制。此前的全押频率统计与防守判断继续生效。这个桌风提高参与感，不代表最优期望收益，也不强制跟任何金额的全押。
+
+本地测试覆盖所有角色持 72o 跟到 6 BB、强牌不连续再加注、12 组完整九人翻前全部留到翻牌、Codex schema 限制、保留手动操作，以及翻后/高成本时恢复弃牌。真实整桌验证脚本为 `python3 scripts/check_flop_first_codex.py`，会使用账户额度。
+
+本轮结果：[72 项自动测试通过](../validation/flop-first-tests.txt)；[真实 Codex 整桌实测](../validation/codex-flop-first-smoke.json)共 9 次决策，首轮零弃牌，9 人看到 `Ac 5s 7d` 三张公共牌，筹码总额 18,000 保持守恒。真实检查只运行到翻牌，未衡量翻牌后的强度。
 
 ## 若继续做强化学习版
 

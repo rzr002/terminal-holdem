@@ -1,0 +1,106 @@
+{
+  "model": "gpt-6-astra",
+  "seed": 42,
+  "decisions": [
+    {
+      "role": "echo",
+      "hole": [
+        "2h",
+        "Jh"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex"
+    },
+    {
+      "role": "moss",
+      "hole": [
+        "Kc",
+        "8c"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex"
+    },
+    {
+      "role": "atlas",
+      "hole": [
+        "6h",
+        "2d"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex"
+    },
+    {
+      "role": "jade",
+      "hole": [
+        "5c",
+        "Ah"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex"
+    },
+    {
+      "role": "raven",
+      "hole": [
+        "5d",
+        "Qh"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex"
+    },
+    {
+      "role": "orbit",
+      "hole": [
+        "4s",
+        "5h"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex"
+    },
+    {
+      "role": "you",
+      "hole": [
+        "3d",
+        "Kh"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex"
+    },
+    {
+      "role": "nova",
+      "hole": [
+        "Qs",
+        "Td"
+      ],
+      "action": "call",
+      "amount": 0,
+      "source": "codex"
+    },
+    {
+      "role": "blaze",
+      "hole": [
+        "3c",
+        "3h"
+      ],
+      "action": "check",
+      "amount": 0,
+      "source": "codex"
+    }
+  ],
+  "scope": "Synthetic nine-seat Codex preflop check; not a win-rate benchmark.",
+  "board": [
+    "Ac",
+    "5s",
+    "7d"
+  ],
+  "live_players": 9,
+  "total_chips": 18000,
+  "elapsed_seconds": 80.28,
+  "passed": true
+}
