@@ -18,6 +18,17 @@ class CLITests(unittest.TestCase):
     def test_default_opponents_are_codex(self):
         self.assertEqual(parser().parse_args([]).agent, 'codex')
 
+    def test_list_models_exits_without_starting_game_or_requesting_codex(self):
+        with tempfile.TemporaryDirectory() as folder:
+            Path(folder, 'models_cache.json').write_text(json.dumps({'models': [
+                {'slug': 'test-fast', 'visibility': 'list', 'description': 'Fast model'}]}))
+            result = subprocess.run([sys.executable, '-m', 'holdem', '--list-models'],
+                                    env=dict(os.environ, CODEX_HOME=folder), cwd=ROOT,
+                                    capture_output=True, text=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('test-fast', result.stdout)
+        self.assertNotIn('HOLD', result.stdout)
+
     def test_default_table_has_player_and_eight_codex_opponents(self):
         args = parser().parse_args([])
         self.assertEqual(args.players, 9)
@@ -92,10 +103,19 @@ class CLITests(unittest.TestCase):
             self.assertIn('HOLD', result.stdout)
             self.assertNotIn('Traceback', result.stderr)
 
+    def test_plain_model_switch_without_automatic_menu_for_piped_input(self):
+        result = self.run_game('--agent', 'codex', '--plain', '--players', '2',
+                               stdin='m\ntest-fast-model\nq\n')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertLess(result.stdout.index('HOLD'), result.stdout.index('选择 Codex 模型'))
+        self.assertIn('已切换到 test-fast-model', result.stdout)
+        self.assertIn('CODEX / test-fast-model', result.stdout)
+
     def test_reject_invalid_cli_values_without_traceback(self):
         for args in [('--players', '1'), ('--players', '10'), ('--stack', '-1'),
                      ('--big-blind', '0'), ('--delay', '-1'), ('--timeout', '0'),
-                     ('--delay', 'nan'), ('--timeout', 'inf'), ('--hands', '-1')]:
+                     ('--delay', 'nan'), ('--timeout', 'inf'), ('--hands', '-1'),
+                     ('--model', 'bad model')]:
             result = self.run_game(*args)
             self.assertEqual(result.returncode, 2)
             self.assertNotIn('Traceback', result.stderr)

@@ -4,6 +4,7 @@ import time
 import unicodedata
 
 from .engine import Action, HAND_NAMES, STREET_NAMES, evaluate
+from .models import available_models, resolve_model_choice, validate_model
 from .strategy import PROFILES
 
 SUIT_GLYPHS = {'s': '♠', 'h': '♥', 'd': '♦', 'c': '♣'}
@@ -106,10 +107,46 @@ def frame_lines(hand, width, provider, autoplay, boss, status, height=None):
 
 
 class PlainUI:
+    def show_models(self, current):
+        options = available_models(current)
+        print('\n选择 Codex 模型 · 当前：' + (current or 'CLI 默认模型'))
+        print('候选来自本机 Codex 缓存；实际可用性以账户为准。')
+        for i, option in enumerate(options, 1):
+            mark = ' *' if option.model == current else ''
+            print(clip(f'  {i}. {option.model}{mark}  {option.description}', 110))
+        if not options:
+            print('暂无缓存列表，可直接输入模型 ID，或 Enter 沿用 CLI 默认模型。')
+        return options
+
+    def pick_model(self, current):
+        options = self.show_models(current)
+        while True:
+            try:
+                answer = input('编号 / 模型 ID / Enter 保持当前 / Q 退出 > ').strip()
+            except EOFError:
+                raise QuitGame
+            if answer.lower() == 'q':
+                raise QuitGame
+            try:
+                return resolve_model_choice(answer, options, current)
+            except ValueError as error:
+                print(error)
+
+    def change_model(self, app):
+        if not app.agent.codex:
+            print('当前为程序对手；使用 --agent codex 启动后可选择模型')
+            return
+        model = self.pick_model(app.pending_model or app.agent.codex.model)
+        print(app.request_model(model))
+
     def agent_error(self, app, hand, message):
         print(f'Codex 未完成决策：{message}。当前行动保持不变。')
         try:
-            return input('R 重试 Codex / Q 退出 > ').strip().lower() == 'r'
+            command = input('R 重试 Codex / M 换模型并重试 / Q 退出 > ').strip().lower()
+            if command == 'm':
+                self.change_model(app)
+                return True
+            return command == 'r'
         except EOFError:
             return False
 
@@ -118,7 +155,7 @@ class PlainUI:
 
     def human_action(self, app, hand):
         self.render(app, hand, '轮到你了')
-        print('F 弃牌 | C 过牌/跟注 | R 120 加注至120 | A 全押 | T 托管 | Q 退出')
+        print('F 弃牌 | C 过牌/跟注 | R 120 加注至120 | A 全押 | T 托管 | M 模型 | Q 退出')
         legal = hand.legal()
         print(f"需跟注 {legal['to_call']}；最小加注至 {legal['min_raise_to']}；最大 {legal['max_raise_to']}")
         while True:
@@ -130,6 +167,9 @@ class PlainUI:
                 raise QuitGame
             if command == 't':
                 app.autoplay = True
+                return None
+            if command == 'm':
+                self.change_model(app)
                 return None
             try:
                 return parse_action(command, legal)
@@ -150,8 +190,13 @@ class PlainUI:
         if finished or app.args.watch or app.autoplay:
             return
         try:
-            if input('Enter 下一手 / Q 退出 > ').strip().lower() == 'q':
-                raise QuitGame
+            while True:
+                command = input('Enter 下一手 / M 模型 / Q 退出 > ').strip().lower()
+                if command == 'q':
+                    raise QuitGame
+                if command != 'm':
+                    return
+                self.change_model(app)
         except EOFError:
             raise QuitGame
 
@@ -172,7 +217,7 @@ class HeadlessUI(PlainUI):
 
 class CursesUI:
     def agent_error(self, app, hand, message):
-        self.notice = 'R 重试 Codex / Q 退出；不会使用本地策略代打'
+        self.notice = 'M 换模型后按 R 重试 / Q 退出'
         while True:
             self.render(app, hand, 'Codex 未完成决策 · 牌局暂停')
             key = self._key(app)
@@ -217,6 +262,79 @@ class CursesUI:
         except self.curses.error:
             pass
 
+    def change_model(self, app):
+        if not app.agent.codex:
+            self.notice = '当前为程序对手；使用 --agent codex 启动后可选择模型'
+            return
+        current = app.pending_model or app.agent.codex.model
+        options = available_models(current)
+        selected = next((i for i, item in enumerate(options) if item.model == current), 0)
+        entered, error = None, ''
+        while True:
+            if self.boss:
+                self.render(app, app.hand)
+            else:
+                self.screen.erase()
+                height, _ = self.screen.getmaxyx()
+                self._write(0, '  选择 Codex 模型', 1, True)
+                self._write(1, f'  当前：{app.agent.codex.model or "CLI 默认模型"}')
+                self._write(2, '  下一次决策生效 · 当前请求会完成 · 保留牌局', 2)
+                labels = [f'{item.model}  {item.description}' for item in options] + ['手动输入模型 ID']
+                capacity = max(1, height - 9)
+                start = max(0, selected - capacity + 1)
+                for row, i in enumerate(range(start, min(len(labels), start + capacity)), 4):
+                    self._write(row, f'  {">" if selected == i else " "} {i + 1}. {labels[i]}',
+                                3 if selected == i else 0)
+                self._write(height - 4, '  模型 ID > ' + entered if entered is not None else
+                            '  ↑↓ / 编号选择 · Enter 确认 · I 手动输入 · Esc 返回', 2)
+                self._write(height - 3, '  ' + (error or '列表来自 Codex 缓存；实际可用性以账户为准'))
+                self._write(height - 2, '  Ctrl-B 隐藏 / 恢复 · Ctrl-C 退出' if entered is not None else
+                            '  B 隐藏 / 恢复 · Q 退出', 1)
+                self.screen.refresh()
+            try:
+                key = self.screen.get_wch()
+            except self.curses.error:
+                continue
+            if key in ('\x03', '\x04') or (entered is None and key in ('q', 'Q')):
+                raise QuitGame
+            if key == '\x02' or ((entered is None or self.boss) and key in ('b', 'B')):
+                self.boss = not self.boss
+                self.screen.clear()
+                continue
+            if self.boss:
+                continue
+            if key == '\x1b':
+                if entered is None:
+                    return
+                entered, error = None, ''
+            elif key in ('\n', '\r', self.curses.KEY_ENTER):
+                if entered is not None:
+                    try:
+                        model = validate_model(entered.strip())
+                    except ValueError as invalid:
+                        error = str(invalid)
+                        continue
+                elif selected == len(options):
+                    entered = ''
+                    continue
+                else:
+                    model = options[selected].model
+                self.notice = app.request_model(model)
+                return
+            elif entered is not None:
+                if key in ('\x7f', '\b', self.curses.KEY_BACKSPACE):
+                    entered = entered[:-1]
+                elif isinstance(key, str) and key.isprintable() and len(entered) < 128:
+                    entered += key
+            elif key in (self.curses.KEY_UP, 'k'):
+                selected = (selected - 1) % (len(options) + 1)
+            elif key in (self.curses.KEY_DOWN, 'j'):
+                selected = (selected + 1) % (len(options) + 1)
+            elif key in ('i', 'I'):
+                entered = ''
+            elif isinstance(key, str) and key in '123456789' and int(key) <= len(options) + 1:
+                selected = int(key) - 1
+
     def render(self, app, hand, status=''):
         screen = self.screen
         height, width = screen.getmaxyx()
@@ -241,7 +359,7 @@ class CursesUI:
         self._write(height - 6, '  ' + status, 2, True)
         legal = hand.legal()
         if app.error:
-            self._write(height - 5, '  R 重试 Codex / Q 退出 · 当前牌局保持不变', 2)
+            self._write(height - 5, '  R 重试 Codex / M 换模型 / Q 退出', 2)
         elif hand.actor == 0 and not hand.done:
             actions = legal['actions']
             call = f"C 跟注 {legal['to_call']}" if legal['to_call'] else 'C 过牌'
@@ -254,9 +372,11 @@ class CursesUI:
         else:
             self._write(height - 5, '  N / Enter 下一手' if hand.done else '  对手行动中；随时可隐藏或暂停')
         note = f'加注至 > {self.raise_text}  （Enter 确认 / Esc 取消）' if self.raise_text is not None else self.notice
+        if app.pending_model:
+            note = f'下一次决策使用 {app.pending_model} · 等待当前决策完成'
         self._write(height - 4, '  ' + note, 2 if self.raise_text is not None else 0)
         self._write(height - 3, '  ' + (app.agent.failure or 'D 庄家 · s 小盲 · b 大盲 · 每手结束公开全部底牌'), 4 if app.agent.failure else 0)
-        self._write(height - 2, '  T 托管开关    P 暂停    B 隐藏 / 恢复    ? 帮助    Q 退出', 1)
+        self._write(height - 2, '  T 托管  M 模型  P 暂停  B 隐藏/恢复  ? 帮助  Q 退出', 1)
         screen.refresh()
 
     def _key(self, app):
@@ -274,6 +394,10 @@ class CursesUI:
             return None
         if self.boss:
             return None
+        if key == 'm':
+            self.raise_text = None
+            self.change_model(app)
+            return None
         if key == 'p':
             self.paused = not self.paused
             return None
@@ -285,7 +409,7 @@ class CursesUI:
                 self.notice = '观战模式全部由 AI 操作；P 可暂停'
             return None
         if key == '?':
-            self.notice = 'C 过牌/跟注；R 输入本轮总额；A 全押；B 隐藏并暂停推进'
+            self.notice = 'C 过牌/跟注；R 本轮总额；A 全押；M 换模型；B 隐藏'
             return None
         return None if self.paused else key
 

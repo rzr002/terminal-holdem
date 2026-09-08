@@ -11,8 +11,9 @@ import random
 import sys
 import threading
 
-from .agents import AgentError, CodexAgent, ResilientAgent
+from .agents import AgentError, CodexAgent, ResilientAgent, configured_model
 from .engine import Hand, MAX_PLAYERS, Player
+from .models import validate_model
 from .ui import HeadlessUI, PlainUI, CursesUI, QuitGame
 from .strategy import PROFILES, PublicStats
 
@@ -34,6 +35,25 @@ class Application:
         self.hand = None
         self.error = ''
         self.memory = PublicStats()
+        self.agent_busy = False
+        self.pending_model = None
+
+    def request_model(self, model):
+        if not self.agent.codex:
+            return '当前为程序对手；使用 --agent codex 启动后可选择模型'
+        if model is None:
+            return '继续使用 CLI 默认模型'
+        self.pending_model = validate_model(model)
+        if self.agent_busy:
+            return f'待切换到 {model} · 当前决策完成后生效'
+        self.apply_pending_model()
+        return f'已切换到 {model}'
+
+    def apply_pending_model(self):
+        if self.pending_model is not None and not self.agent_busy:
+            self.agent.codex.model = self.args.model = self.pending_model
+            self.pending_model = None
+            self.agent.failure = ''
 
     def run(self, ui):
         button = 0
@@ -43,6 +63,7 @@ class Application:
                 h = self.hand = Hand(self.players, button, max(1, self.args.big_blind // 2),
                                      self.args.big_blind, self.rng, self.hands_played + 1)
                 while not h.done:
+                    self.apply_pending_model()
                     if h.actor == 0 and not (self.args.watch or self.autoplay or self.args.headless):
                         action = ui.human_action(self, h)
                         if action is None:
@@ -60,9 +81,13 @@ class Application:
                         seat = h.actor
                         observation = h.observation(seat)
                         observation['opponent_stats'] = self.memory.snapshot()
-                        future = pool.submit(self.agent.decide, observation, STYLES[seat], self.cancel)
                         try:
-                            decision = ui.wait_decision(self, h, future)
+                            self.agent_busy = True
+                            try:
+                                future = pool.submit(self.agent.decide, observation, STYLES[seat], self.cancel)
+                                decision = ui.wait_decision(self, h, future)
+                            finally:
+                                self.agent_busy = False
                         except AgentError as error:
                             self.error = str(error)
                             if not ui.agent_error(self, h, self.error):
@@ -73,6 +98,7 @@ class Application:
                             continue
                         h.act(decision.action)
                         self.decisions[decision.source] += 1
+                        self.apply_pending_model()
                         if isinstance(ui, CursesUI):
                             last_action = next(line for line in reversed(h.history) if line.startswith(NAMES[seat] + ' '))
                             ui.notice = f'{decision.source} · {last_action}'
@@ -102,7 +128,8 @@ class Application:
 def parser():
     p = argparse.ArgumentParser(description='终端德州扑克 · Codex 牌手 / 本地策略 · 纯虚拟筹码')
     p.add_argument('--agent', choices=['codex', 'strategic', 'local', 'auto'], default='codex', help='默认 Codex + 角色技能；strategic 为程序策略；local 为旧测试策略。失败不替换对手')
-    p.add_argument('--model', help='指定 Codex 模型；省略则沿用本机 Codex 配置中的模型')
+    p.add_argument('--model', type=validate_model, help='指定 Codex 模型并跳过启动菜单；非交互运行省略时沿用 Codex 配置')
+    p.add_argument('--list-models', action='store_true', help='列出本机 Codex 缓存中的模型后退出')
     p.add_argument('--players', type=int, default=MAX_PLAYERS, help=f'总座位数，含你，2–{MAX_PLAYERS}（默认九人满员桌）')
     p.add_argument('--stack', type=int, default=2000, help='每人初始筹码（默认 2000）')
     p.add_argument('--big-blind', type=int, default=20, help='大盲注（默认 20，小盲为其一半取整）')
@@ -127,14 +154,24 @@ def main(argv=None):
         p.error('筹码和盲注必须为正整数，手数不能为负')
     if not math.isfinite(args.delay) or not math.isfinite(args.timeout) or args.delay < 0 or args.timeout <= 0:
         p.error('--delay 必须为有限非负数，--timeout 必须为有限正数')
+    if args.list_models:
+        PlainUI().show_models(args.model or configured_model())
+        return 0
+    if (args.agent in ('codex', 'auto') and args.model is None and not args.headless
+            and not args.check_codex and sys.stdin.isatty() and sys.stdout.isatty()):
+        try:
+            args.model = PlainUI().pick_model(configured_model())
+        except (QuitGame, KeyboardInterrupt):
+            return 0
     if args.check_codex:
         hand = Hand([Player('YOU', 200), Player('NOVA', 200)])
         try:
-            result = CodexAgent(model=args.model, timeout=args.timeout).decide(hand.observation(hand.actor))
+            agent = CodexAgent(model=args.model, timeout=args.timeout)
+            result = agent.decide(hand.observation(hand.actor))
         except (OSError, ValueError, RuntimeError, TimeoutError) as error:
             print(f'Codex 连接失败：{error}', file=sys.stderr)
             return 1
-        print(f'Codex 连接成功：{result.action.kind} {result.action.amount}（真实模型决策）')
+        print(f'Codex 连接成功 · {agent.model or "CLI 默认模型"}：{result.action.kind} {result.action.amount}（真实模型决策）')
         return 0
     app = Application(args)
     if args.headless:

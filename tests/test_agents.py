@@ -37,13 +37,14 @@ from pathlib import Path
 args = sys.argv
 assert args[args.index('--sandbox') + 1] == 'read-only'
 assert '--ephemeral' in args and '--ignore-user-config' in args
+assert args[args.index('--model') + 1] == 'test-fast-model'
 prompt = sys.stdin.read()
 assert 'hole' in prompt and 'legal' in prompt
 schema = json.loads(Path(args[args.index('--output-schema')+1]).read_text())
 assert schema['additionalProperties'] is False
 Path(args[args.index('-o') + 1]).write_text(json.dumps({'action':'call','amount':0,'reason':'pot odds'}))
 ''')
-            decision = CodexAgent(binary=binary, timeout=3).decide(self.view(), 'balanced')
+            decision = CodexAgent(binary=binary, model='test-fast-model', timeout=3).decide(self.view(), 'balanced')
             self.assertEqual(decision.action, Action('call'))
             self.assertEqual(decision.source, 'codex')
 

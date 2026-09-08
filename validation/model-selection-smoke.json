@@ -1,0 +1,11 @@
+{
+  "date": "2026-09-08",
+  "method": "python3 play.py --check-codex --model MODEL --timeout 60; elapsed measured with /usr/bin/time -p",
+  "scope": "One real Codex CLI decision per model, using the signed-in account and the game's role prompt and structured output schema.",
+  "limitations": "Connection and legal-action smoke tests, not a controlled speed benchmark. Each run uses a newly dealt two-player hand. Spark and Luna checks ran concurrently. Elapsed time includes CLI startup and strategy analysis.",
+  "results": [
+    {"model": "gpt-5.4-mini", "exit_code": 0, "action": "call", "amount": 0, "elapsed_seconds": 9.22},
+    {"model": "gpt-5.3-codex-spark", "exit_code": 0, "action": "raise", "amount": 20, "elapsed_seconds": 6.78},
+    {"model": "gpt-5.6-luna", "exit_code": 0, "action": "call", "amount": 0, "elapsed_seconds": 7.52}
+  ]
+}
