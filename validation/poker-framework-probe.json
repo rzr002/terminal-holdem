@@ -1,0 +1,238 @@
+{
+  "python": "3.13.3",
+  "machine": "arm64",
+  "scope": "Research probe, not an integration or strength benchmark.",
+  "rlcard": {
+    "version": "1.2.0",
+    "random_games": [
+      {
+        "players": 2,
+        "hands": 100,
+        "actions": 268,
+        "seconds": 0.007,
+        "observation_shape": [
+          54
+        ],
+        "actions_available": {
+          "FOLD": 0,
+          "CHECK_CALL": 1,
+          "RAISE_HALF_POT": 2,
+          "RAISE_POT": 3,
+          "ALL_IN": 4
+        },
+        "terminal_and_zero_sum": true
+      },
+      {
+        "players": 6,
+        "hands": 100,
+        "actions": 809,
+        "seconds": 0.016,
+        "observation_shape": [
+          54
+        ],
+        "actions_available": {
+          "FOLD": 0,
+          "CHECK_CALL": 1,
+          "RAISE_HALF_POT": 2,
+          "RAISE_POT": 3,
+          "ALL_IN": 4
+        },
+        "terminal_and_zero_sum": true
+      },
+      {
+        "players": 9,
+        "hands": 100,
+        "actions": 1109,
+        "seconds": 0.0214,
+        "observation_shape": [
+          54
+        ],
+        "actions_available": {
+          "FOLD": 0,
+          "CHECK_CALL": 1,
+          "RAISE_HALF_POT": 2,
+          "RAISE_POT": 3,
+          "ALL_IN": 4
+        },
+        "terminal_and_zero_sum": true
+      }
+    ],
+    "private_board_swap_has_identical_default_vector": true,
+    "scope": "Default vector only; raw_obs and action_record have more information."
+  },
+  "openspiel": {
+    "version": "2.0.2",
+    "random_games": [
+      {
+        "players": 2,
+        "hands": 100,
+        "decisions": 322,
+        "seconds": 0.0139,
+        "parameters": {
+          "betting": "nolimit",
+          "numPlayers": 2,
+          "numRounds": 4,
+          "stack": "2000 2000",
+          "blind": "20 10",
+          "firstPlayer": "2 1 1 1",
+          "numSuits": 4,
+          "numRanks": 13,
+          "numHoleCards": 2,
+          "numBoardCards": "0 3 1 1",
+          "bettingAbstraction": "fchpa"
+        },
+        "num_distinct_actions": 5,
+        "information_state_tensor_shape": [
+          181
+        ],
+        "terminal_and_zero_sum": true
+      },
+      {
+        "players": 2,
+        "hands": 100,
+        "decisions": 391,
+        "seconds": 0.0067,
+        "parameters": {
+          "betting": "nolimit",
+          "numPlayers": 2,
+          "numRounds": 4,
+          "stack": "2000 2000",
+          "blind": "20 10",
+          "firstPlayer": "2 1 1 1",
+          "numSuits": 4,
+          "numRanks": 13,
+          "numHoleCards": 2,
+          "numBoardCards": "0 3 1 1",
+          "bettingAbstraction": "fullgame"
+        },
+        "num_distinct_actions": 2001,
+        "information_state_tensor_shape": [
+          460
+        ],
+        "terminal_and_zero_sum": true
+      },
+      {
+        "players": 6,
+        "hands": 100,
+        "decisions": 833,
+        "seconds": 0.0066,
+        "parameters": {
+          "betting": "nolimit",
+          "numPlayers": 6,
+          "numRounds": 4,
+          "stack": "2000 2000 2000 2000 2000 2000",
+          "blind": "10 20 0 0 0 0",
+          "firstPlayer": "3 1 1 1",
+          "numSuits": 4,
+          "numRanks": 13,
+          "numHoleCards": 2,
+          "numBoardCards": "0 3 1 1",
+          "bettingAbstraction": "fchpa"
+        },
+        "num_distinct_actions": 5,
+        "information_state_tensor_shape": [
+          296
+        ],
+        "terminal_and_zero_sum": true
+      },
+      {
+        "players": 6,
+        "hands": 100,
+        "decisions": 855,
+        "seconds": 0.0396,
+        "parameters": {
+          "betting": "nolimit",
+          "numPlayers": 6,
+          "numRounds": 4,
+          "stack": "2000 2000 2000 2000 2000 2000",
+          "blind": "10 20 0 0 0 0",
+          "firstPlayer": "3 1 1 1",
+          "numSuits": 4,
+          "numRanks": 13,
+          "numHoleCards": 2,
+          "numBoardCards": "0 3 1 1",
+          "bettingAbstraction": "fullgame"
+        },
+        "num_distinct_actions": 2001,
+        "information_state_tensor_shape": [
+          1736
+        ],
+        "terminal_and_zero_sum": true
+      },
+      {
+        "players": 9,
+        "hands": 100,
+        "decisions": 1135,
+        "seconds": 0.0085,
+        "parameters": {
+          "betting": "nolimit",
+          "numPlayers": 9,
+          "numRounds": 4,
+          "stack": "2000 2000 2000 2000 2000 2000 2000 2000 2000",
+          "blind": "10 20 0 0 0 0 0 0 0",
+          "firstPlayer": "3 1 1 1",
+          "numSuits": 4,
+          "numRanks": 13,
+          "numHoleCards": 2,
+          "numBoardCards": "0 3 1 1",
+          "bettingAbstraction": "fchpa"
+        },
+        "num_distinct_actions": 5,
+        "information_state_tensor_shape": [
+          365
+        ],
+        "terminal_and_zero_sum": true
+      },
+      {
+        "players": 9,
+        "hands": 100,
+        "decisions": 1160,
+        "seconds": 0.0224,
+        "parameters": {
+          "betting": "nolimit",
+          "numPlayers": 9,
+          "numRounds": 4,
+          "stack": "2000 2000 2000 2000 2000 2000 2000 2000 2000",
+          "blind": "10 20 0 0 0 0 0 0 0",
+          "firstPlayer": "3 1 1 1",
+          "numSuits": 4,
+          "numRanks": 13,
+          "numHoleCards": 2,
+          "numBoardCards": "0 3 1 1",
+          "bettingAbstraction": "fullgame"
+        },
+        "num_distinct_actions": 2001,
+        "information_state_tensor_shape": [
+          2693
+        ],
+        "terminal_and_zero_sum": true
+      }
+    ]
+  },
+  "learning": {
+    "game": "two-player Kuhn poker",
+    "algorithm": "external-sampling MCCFR",
+    "seed": 31,
+    "seconds": 0.3618,
+    "checkpoints": [
+      {
+        "iterations": 0,
+        "exploitability": 0.4583333333333333
+      },
+      {
+        "iterations": 100,
+        "exploitability": 0.12524199865787514
+      },
+      {
+        "iterations": 1000,
+        "exploitability": 0.033793191596944744
+      },
+      {
+        "iterations": 5000,
+        "exploitability": 0.014262159721501633
+      }
+    ],
+    "improved": true,
+    "scope": "Tiny-game learning demonstration only; no trained full-Holdem opponent exported."
+  }
+}

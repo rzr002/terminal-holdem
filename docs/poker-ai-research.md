@@ -10,8 +10,8 @@
 | --- | --- | --- |
 | [Pluribus](https://www.cs.cmu.edu/news/2019/carnegie-mellon-and-facebook-ai-beats-professionals-six-player-poker) | CMU 与 Facebook 的六人无限注研究系统，验证过对顶尖人类牌手的表现；使用自我对弈、混合策略与搜索 | 六人研究结论不是九人保证。本项目未获得或接入其模型权重 |
 | [DeepStack 论文](https://arxiv.org/abs/1701.01724) / [公开示例](https://github.com/lifrordi/DeepStack-Leduc) | 两人无限注研究，结合持续重新求解与价值估计；公开示例针对简化 Leduc | 公开 Leduc 示例不是可直接接入完整九人德州的牌手 |
-| [RLCard](https://github.com/datamllab/rlcard) | 卡牌强化学习环境，提供 DQN、NFSP、CFR 等算法；模型库的德州相关现成模型包括简化 Leduc CFR 与限注规则模型 | [无限注文档](https://rlcard.org/games.html#no-limit-texas-hold-em)展示两名玩家筹码编码与抽象动作，需要核对当前实现、重做九人编码和动作适配，并训练对应模型 |
-| [OpenSpiel](https://github.com/google-deepmind/open_spiel) | 不完全信息游戏研究框架；[算法目录](https://openspiel.readthedocs.io/en/latest/algorithms.html)提供 CFR、外部采样 MCCFR 等实现 | 适合后续训练和评测工程，框架本身不是训练好的九人高手权重 |
+| [RLCard](https://github.com/datamllab/rlcard) | 卡牌强化学习环境，提供 DQN、NFSP、CFR 等算法；模型库的德州相关现成模型包括简化 Leduc CFR 与限注规则模型 | 已实测 1.2.0 可以运行 2/6/9 人无限注；默认 54 维输入仍需重做，不能直接载入 Leduc 或限注模型 |
+| [OpenSpiel](https://github.com/google-deepmind/open_spiel) | 不完全信息游戏研究框架；[算法目录](https://openspiel.readthedocs.io/en/latest/algorithms.html)提供 CFR、外部采样 MCCFR 等实现 | 已实测 2.0.2 的九人 52 张牌无限注配置；推荐作为训练与评测基础，仍需训练权重 |
 | [fedden/poker_ai](https://github.com/fedden/poker_ai) | 开源 MCCFR 自我对弈、聚类和训练流程 | README 明确说明未修改时支持 20 张牌的牌堆；不能作为当前 52 张牌九人桌的即插即用模型 |
 
 本次未找到并验证一个可以直接载入当前九人规则的现成高手检查点。没有下载未经验证的权重，没有启动长时间训练，也没有把简化牌局的训练结果当作完整德州能力。
@@ -93,6 +93,8 @@ python3 scripts/check_strategy_codex.py
 本次九项真实模型检查全部通过：NOVA、BLAZE、ECHO、MOSS 分别用 98s、KTo、66、A5s 跟小开池；ATLAS、JADE、RAVEN、ORBIT 分别用 AQs、JJ、KQs、99 跟反复全押者；NOVA 的 72o 仍弃牌。记录见 [Codex 活跃桌场景检查](../validation/codex-table-style-smoke.json)。这些是指定局面的单次响应，不代表长期跟注频率。另有 66 项本地自动测试通过。
 
 ## 若继续做强化学习版
+
+后续核查已形成[训练牌手接入可行性与实施方案](trained-opponents-feasibility.md)，包含本机运行记录、RLCard 输入信息缺失、OpenSpiel 九人配置、动作编号差异和 Codex 混合牌桌设计。该文是进一步接入工作的具体依据；本次没有把研究实验替换为游戏中的对手。
 
 建议先用 OpenSpiel 或 RLCard 的简化环境复现 CFR/NFSP，再建立与本引擎一致的训练接口。完整九人牌手需要固定人数和规则、设计位置/下注历史/多边池的观察编码、定义合法动作掩码及 raise-to 映射，用自我对弈训练并保存版本化权重。训练与推理必须只见各自信息集，评价器可见的隐藏牌不能流入策略。
 

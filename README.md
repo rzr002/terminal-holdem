@@ -82,6 +82,8 @@ Codex 与本地策略都只接收该座位的底牌、公共牌、公开下注�
 
 这些是增强后的决策指导和启发式计算，尚未完成强化学习训练或职业强度验证。[扑克 AI 调研与角色 skill 索引](docs/poker-ai-research.md)说明 Pluribus、DeepStack、RLCard、OpenSpiel 与当前九人桌的区别。
 
+[训练牌手接入方案](docs/trained-opponents-feasibility.md)进一步核验了 RLCard / OpenSpiel 的九人运行条件，并附可复现的小型 CFR 学习实验；这些框架尚未作为游戏对手接入。
+
 程序版可以显式选择，不需要模型请求：
 
 ```bash
