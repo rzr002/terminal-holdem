@@ -42,6 +42,21 @@ class CLITests(unittest.TestCase):
         self.assertEqual(result['error'], '')
         self.assertEqual(result['hands_played'], 1)
 
+    def test_next_hand_receives_public_stats_and_specific_role(self):
+        app = Application(parser().parse_args(['--headless', '--hands', '2']))
+        app.agent.missing_binary = False
+        with patch.object(app.agent.codex, 'decide', return_value=Decision(Action('fold'), 'codex')) as decide:
+            result = app.run(HeadlessUI())
+        self.assertEqual(result['hands_played'], 2)
+        roles = {call.args[1] for call in decide.call_args_list}
+        self.assertEqual(roles, {'you', 'nova', 'blaze', 'echo', 'moss', 'atlas', 'jade', 'raven', 'orbit'})
+        second_hand = [call.args[0] for call in decide.call_args_list if call.args[0]['hand'] == 2]
+        self.assertTrue(second_hand)
+        for obs in second_hand:
+            self.assertEqual(len(obs['opponent_stats']), 9)
+            self.assertTrue(all(row['hands'] == 1 for row in obs['opponent_stats']))
+            self.assertTrue(all('hole' not in row for row in obs['opponent_stats']))
+
     def test_codex_failure_stops_with_nonzero_exit_and_no_fake_actions(self):
         with tempfile.TemporaryDirectory() as folder:
             binary = Path(folder) / 'codex'

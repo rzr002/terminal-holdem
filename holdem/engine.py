@@ -83,6 +83,7 @@ class Hand:
         self.number = number
         self.board, self.history, self.results = [], [], []
         self.review_board = []
+        self.action_history = []
         self.street = 'preflop'
         self.done = self.showdown = False
         self.actor = None
@@ -162,6 +163,7 @@ class Hand:
             raise ValueError(f"加注总额应为 {legal['min_raise_to']}–{legal['max_raise_to']}")
         i = self.actor
         p = self.players[i]
+        stack_before, bet_before = p.stack, self.current_bet
         self.pending.discard(i)
         if action.kind == 'fold':
             p.folded = True
@@ -191,6 +193,12 @@ class Hand:
         self.acted_at[i] = self.current_bet
         p.last_action = label
         self.history.append(f'{p.name} {label}')
+        verb = 'raise' if p.bet > bet_before else ('call' if p.stack < stack_before else action.kind)
+        self.action_history.append({'seat': i, 'street': self.street, 'action': verb,
+                                    'paid': stack_before - p.stack,
+                                    'raise_to': p.bet if verb == 'raise' else 0,
+                                    'to_call_before': legal['to_call'],
+                                    'all_in': p.stack == 0 and not p.folded})
         self._progress(i)
 
     def _pay(self, i, amount):
@@ -283,7 +291,7 @@ class Hand:
                 'board': self.board.copy(), 'pot': self.pot, 'big_blind': self.big_blind,
                 'current_bet': self.current_bet,
                 'players': [{'seat': i, 'name': p.name, 'stack': p.stack, 'bet': p.bet,
-                             'committed': p.committed, 'folded': p.folded}
+                             'committed': p.committed, 'folded': p.folded, 'dealt_in': bool(p.hole)}
                             for i, p in enumerate(self.players)],
                 'legal': self.legal() if seat == self.actor else {'actions': []},
-                'history': self.history.copy()}
+                'history': self.history.copy(), 'action_history': [event.copy() for event in self.action_history]}

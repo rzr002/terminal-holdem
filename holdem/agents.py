@@ -14,14 +14,8 @@ import tomllib
 import urllib.request
 
 from .engine import Action, DECK, evaluate
+from .strategy import analyze, profile_for, skill_text
 
-PERSONALITIES = {
-    'balanced': '均衡型：根据底池赔率、位置和牌力决策，适度诈唬。',
-    'tight': '稳健型：选择性入池，重视价值下注，避免用弱牌支付大额下注。',
-    'aggressive': '进攻型：善用位置和半诈唬施压，但不无脑全押。',
-    'tricky': '灵活型：混合慢打、价值下注和小概率诈唬，保持难以预测。',
-    'loose': '宽松型：喜欢看翻牌，但会在明显不利的大额下注前弃牌。',
-}
 SCHEMA = {
     'type': 'object',
     'properties': {'action': {'type': 'string', 'enum': ['fold', 'check', 'call', 'raise', 'allin']},
@@ -99,7 +93,7 @@ class LocalAgent:
             if ours == max(scores):
                 wins += 1 / scores.count(ours)
         equity = wins / self.samples
-        bias = {'tight': -0.10, 'balanced': 0, 'aggressive': 0.10, 'tricky': 0.04, 'loose': 0.06}.get(personality, 0)
+        bias = {'tight': -0.10, 'balanced': 0, 'aggressive': 0.10, 'tricky': 0.04, 'loose': 0.06}.get(profile_for(personality).legacy, 0)
         legal = obs['legal']
         cost = legal['to_call']
         price = cost / max(1, obs['pot'] + cost)
@@ -117,11 +111,75 @@ class LocalAgent:
         return Decision(action, 'local')
 
 
+class StrategicAgent:
+    """Explicit offline opponent using ranges and poker heuristics, not trained RL."""
+
+    def __init__(self, rng=None, samples=192):
+        self.rng = rng or random.Random()
+        self.samples = samples
+
+    def decide(self, obs, personality='balanced', cancel=None):
+        info = analyze(obs, self.rng, samples=self.samples, cancel=cancel)
+        profile = profile_for(personality)
+        legal = obs['legal']
+        hero = obs['players'][obs['seat']]
+        cost, equity = legal['to_call'], info['range_equity']
+        opponents = [p for p in obs['players'] if p['seat'] != obs['seat'] and not p['folded']]
+        can_raise = 'raise' in legal['actions']
+
+        def raise_to(target):
+            return Decision(Action('raise', min(legal['max_raise_to'], max(legal['min_raise_to'], round(target)))), 'strategic')
+
+        if obs['street'] == 'preflop' and any(p['stack'] > 0 for p in opponents):
+            strength = info['preflop_strength']
+            raises = info['preflop_raises']
+            if raises == 0:
+                thresholds = {'UTG': 0.67, 'UTG+1': 0.65, 'MP': 0.63, 'LJ': 0.61,
+                              'HJ': 0.58, 'CO': 0.49, 'BTN': 0.43, 'SB': 0.48, 'BB': 0.57}
+                threshold = thresholds[info['position']] - profile.openness
+                if strength < threshold:
+                    return Decision(Action('fold' if cost else 'check'), 'strategic')
+                if can_raise:
+                    limpers = sum(e['street'] == 'preflop' and e['action'] == 'call'
+                                  for e in obs.get('action_history', []))
+                    target = obs['big_blind'] * (2.5 + limpers)
+                    if hero['stack'] <= 10 * obs['big_blind'] and strength >= 0.78:
+                        target = legal['max_raise_to']
+                    return raise_to(target)
+            else:
+                value_threshold = min(0.97, 0.87 + 0.035 * (raises - 1) - profile.aggression)
+                if strength >= value_threshold and can_raise:
+                    return raise_to(obs['current_bet'] * (3 if info['in_position_postflop'] else 4))
+                if strength < 0.51 + min(0.18, raises * 0.04) - profile.openness and cost:
+                    return Decision(Action('fold'), 'strategic')
+
+        realization = 1 if len(obs['board']) == 5 else (0.86 if info['in_position_postflop'] else 0.74)
+        if info['has_draw']:
+            realization += 0.04
+        if all(p['stack'] == 0 for p in opponents) or hero['stack'] == cost:
+            realization = 1  # No future betting to deny equity.
+        call_return = info['call_ev_chips'] + cost
+        if cost and call_return * realization < cost:
+            return Decision(Action('fold'), 'strategic')
+        if obs['street'] != 'preflop' and can_raise:
+            category = evaluate(obs['hole'] + obs['board'])[0]
+            fragile_pair = category <= 1 and info['spr'] > 4 and len(opponents) > 1
+            value_threshold = (0.66 if len(opponents) == 1 else 0.60) - profile.aggression / 2
+            if equity >= value_threshold and not fragile_pair:
+                return raise_to(info['bet_sizes_raise_to']['large'])
+            can_make_everyone_fold = all(p['stack'] > 0 for p in opponents)
+            if (info['has_draw'] and equity > 0.25 and len(opponents) <= 2 and
+                    can_make_everyone_fold and self.rng.random() < profile.bluff):
+                return raise_to(info['bet_sizes_raise_to']['half'])
+        return Decision(Action('check' if 'check' in legal['actions'] else 'call'), 'strategic')
+
+
 class CodexAgent:
-    def __init__(self, binary=None, model=None, timeout=60):
+    def __init__(self, binary=None, model=None, timeout=60, rng=None):
         self.binary = binary or shutil.which('codex') or 'codex'
         self.model = model or configured_model()
         self.timeout = timeout
+        self.rng = rng or random.Random()
 
     @staticmethod
     def _stop(process):
@@ -145,19 +203,25 @@ class CodexAgent:
     def decide(self, obs, personality='balanced', cancel=None):
         if cancel and cancel.is_set():
             raise InterruptedError('已取消')
+        instructions = skill_text(personality)
+        analysis = analyze(obs, self.rng, cancel=cancel)
+        analysis['mix_roll'] = round(self.rng.random(), 5)
         prompt = (
             '你是一名虚拟筹码无限注德州扑克玩家。只决定当前一手的一次行动。'
             '不要调用工具、读文件、使用网络或尝试获取其他玩家底牌。'
-            '仅使用下面的信息；其他玩家底牌未知。' + PERSONALITIES.get(personality, PERSONALITIES['balanced']) +
+            '仅使用下面的信息；其他玩家底牌未知。以下是应用加载的共享策略与当前角色 skill。\n' + instructions +
             '\n返回符合 schema 的 JSON。action 必须在 legal.actions 中。'
             'raise 的 amount 是本轮累计下注总额（raise TO），必须在 min_raise_to 和 max_raise_to 之间。'
             '其他动作 amount=0。call 的金额由引擎确定，包括不足额全押。reason 用一句短中文。'
+            '\nSTRATEGY_ANALYSIS:\n' + json.dumps(analysis, ensure_ascii=False) +
             '\nOBSERVATION:\n' + json.dumps(obs, ensure_ascii=False)
         )
         with tempfile.TemporaryDirectory(prefix='holdem-agent-') as folder:
             schema = Path(folder) / 'schema.json'
             output = Path(folder) / 'decision.json'
             schema.write_text(json.dumps(SCHEMA), encoding='utf-8')
+            prompt_file = Path(folder) / 'prompt.txt'
+            prompt_file.write_text(prompt, encoding='utf-8')
             command = [self.binary, '-a', 'never', 'exec', '--ignore-user-config',
                        '--sandbox', 'read-only', '--skip-git-repo-check', '--ephemeral',
                        '--color', 'never', '-C', folder, '--output-schema', str(schema), '-o', str(output),
@@ -170,14 +234,13 @@ class CodexAgent:
                 command.extend(['--model', self.model])
             command.append('-')
             # Files prevent verbose CLI output from blocking a full pipe or leaking into the TUI.
-            with (Path(folder) / 'stdout.log').open('w') as stdout, (Path(folder) / 'stderr.log').open('w') as stderr:
-                process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=stdout, stderr=stderr,
+            # A regular stdin file cannot fill a pipe when the CLI is slow to start.
+            with prompt_file.open('r', encoding='utf-8') as source, (Path(folder) / 'stdout.log').open('w') as stdout, (Path(folder) / 'stderr.log').open('w') as stderr:
+                process = subprocess.Popen(command, stdin=source, stdout=stdout, stderr=stderr,
                                            text=True, encoding='utf-8', cwd=folder,
                                            env=codex_environment(),
                                            start_new_session=os.name == 'posix')
                 try:
-                    process.stdin.write(prompt)
-                    process.stdin.close()
                     started = time.monotonic()
                     while process.poll() is None:
                         if cancel and cancel.is_set():
@@ -192,8 +255,6 @@ class CodexAgent:
                     data = json.loads(output.read_text(encoding='utf-8'))
                     return Decision(parse_decision(data, obs), 'codex')
                 finally:
-                    if process.stdin and not process.stdin.closed:
-                        process.stdin.close()
                     self._stop(process)
 
 
@@ -201,16 +262,18 @@ class ResilientAgent:
     """Select an explicitly requested provider. Never substitute another provider."""
 
     def __init__(self, mode='codex', binary=None, model=None, timeout=60, rng=None):
-        self.local = LocalAgent(rng) if mode == 'local' else None
-        self.codex = None if mode == 'local' else CodexAgent(binary, model, timeout)
-        self.missing_binary = mode != 'local' and binary is None and not shutil.which('codex')
+        self.local = LocalAgent(rng) if mode == 'local' else (StrategicAgent(rng) if mode == 'strategic' else None)
+        self.codex = None if self.local else CodexAgent(binary, model, timeout, rng)
+        self.missing_binary = self.codex is not None and binary is None and not shutil.which('codex')
         self.failure = ''
 
     @property
     def label(self):
         if self.failure:
             return 'CODEX / 连接失败'
-        return f'CODEX / {self.codex.model or "CLI 默认模型"}' if self.codex else 'LOCAL'
+        if self.codex:
+            return f'CODEX / {self.codex.model or "CLI 默认模型"}'
+        return 'STRATEGIC / 程序策略' if isinstance(self.local, StrategicAgent) else 'LOCAL'
 
     def decide(self, obs, personality='balanced', cancel=None):
         if self.local:

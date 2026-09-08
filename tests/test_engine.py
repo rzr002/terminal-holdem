@@ -217,6 +217,17 @@ class RulesTests(unittest.TestCase):
         self.assertNotIn('deck', obs)
         self.assertTrue(all('hole' not in p for p in obs['players']))
 
+    def test_public_action_history_preserves_street_and_raise_to(self):
+        h = self.hand()
+        h.act(Action('raise', 30))
+        obs = h.observation(1)
+        self.assertIn('action_history', obs)
+        event = obs['action_history'][0]
+        self.assertEqual((event['seat'], event['street'], event['action']), (0, 'preflop', 'raise'))
+        self.assertEqual((event['paid'], event['raise_to'], event['to_call_before']), (30, 30, 10))
+        event['paid'] = 999
+        self.assertEqual(h.observation(1)['action_history'][0]['paid'], 30)
+
     def test_seeded_random_play_always_terminates_and_conserves_chips(self):
         rng = random.Random(42)
         for n in range(2, 10):

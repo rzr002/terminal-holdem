@@ -60,6 +60,22 @@ Path(sys.argv[sys.argv.index('-o')+1]).write_text('{"action":"raise","amount":99
                 self.assertTrue(agent.failure)
                 self.assertNotIn('LOCAL', agent.label)
 
+    def test_codex_receives_role_skill_analysis_and_only_its_own_cards(self):
+        with tempfile.TemporaryDirectory() as folder:
+            binary = self.executable(folder, '''import sys, json
+from pathlib import Path
+prompt = sys.stdin.read()
+assert 'poker-core' in prompt and 'poker-nova' in prompt
+analysis = json.loads(prompt.split('STRATEGY_ANALYSIS:\\n')[1].split('\\nOBSERVATION:')[0])
+assert 'range_equity' in analysis and 'pot_odds' in analysis
+obs = json.loads(prompt.split('OBSERVATION:\\n')[1])
+assert all('hole' not in p for p in obs['players'])
+assert 'deck' not in obs and 'review_board' not in obs
+Path(sys.argv[sys.argv.index('-o') + 1]).write_text('{"action":"call","amount":0}')
+''')
+            decision = CodexAgent(binary=binary, timeout=3).decide(self.view(), 'nova')
+            self.assertEqual(decision.source, 'codex')
+
     def test_system_proxy_is_passed_to_codex_without_changing_parent_environment(self):
         import os
         with tempfile.TemporaryDirectory() as folder:
@@ -101,6 +117,14 @@ Path(sys.argv[sys.argv.index('-o')+1]).write_text('{"action":"call","amount":0}'
                     CodexAgent(binary=binary, timeout=2).decide(self.view(), cancel=event)
             finally:
                 timer.join()
+
+    def test_large_skill_prompt_cannot_block_timeout_when_child_does_not_read(self):
+        with tempfile.TemporaryDirectory() as folder:
+            binary = self.executable(folder, 'import time\ntime.sleep(2)\n')
+            obs = self.view()
+            obs['history'] = ['公开行动记录 ' * 1000] * 30
+            with self.assertRaises(TimeoutError):
+                CodexAgent(binary=binary, timeout=0.1).decide(obs, 'nova')
 
     def test_local_agent_only_chooses_legal_actions_across_full_hands(self):
         rng = random.Random(23)

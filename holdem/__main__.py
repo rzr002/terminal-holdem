@@ -14,9 +14,10 @@ import threading
 from .agents import AgentError, CodexAgent, ResilientAgent
 from .engine import Hand, MAX_PLAYERS, Player
 from .ui import HeadlessUI, PlainUI, CursesUI, QuitGame
+from .strategy import PROFILES, PublicStats
 
-NAMES = ['YOU', 'NOVA', 'BLAZE', 'ECHO', 'MOSS', 'ATLAS', 'JADE', 'RAVEN', 'ORBIT']
-STYLES = ['balanced', 'tight', 'aggressive', 'tricky', 'loose', 'balanced', 'tight', 'aggressive', 'tricky']
+NAMES = [profile.name for profile in PROFILES]
+STYLES = [profile.key for profile in PROFILES]
 
 
 class Application:
@@ -32,6 +33,7 @@ class Application:
         self.hands_played = 0
         self.hand = None
         self.error = ''
+        self.memory = PublicStats()
 
     def run(self, ui):
         button = 0
@@ -56,7 +58,9 @@ class Application:
                         self.decisions['human'] += 1
                     else:
                         seat = h.actor
-                        future = pool.submit(self.agent.decide, h.observation(seat), STYLES[seat], self.cancel)
+                        observation = h.observation(seat)
+                        observation['opponent_stats'] = self.memory.snapshot()
+                        future = pool.submit(self.agent.decide, observation, STYLES[seat], self.cancel)
                         try:
                             decision = ui.wait_decision(self, h, future)
                         except AgentError as error:
@@ -75,6 +79,7 @@ class Application:
                     ui.render(self, h)
                     ui.wait(self, h, self.args.delay)
                 self.hands_played += 1
+                self.memory.record(h.observation(0))
                 funded = [i for i, p in enumerate(self.players) if p.stack]
                 limit = self.args.hands or (100 if self.args.headless else 0)
                 finished = len(funded) < 2 or (limit > 0 and self.hands_played >= limit)
@@ -96,7 +101,7 @@ class Application:
 
 def parser():
     p = argparse.ArgumentParser(description='终端德州扑克 · Codex 牌手 / 本地策略 · 纯虚拟筹码')
-    p.add_argument('--agent', choices=['codex', 'local', 'auto'], default='codex', help='默认 Codex；失败暂停，不替换对手。auto 是 codex 的兼容别名')
+    p.add_argument('--agent', choices=['codex', 'strategic', 'local', 'auto'], default='codex', help='默认 Codex + 角色技能；strategic 为程序策略；local 为旧测试策略。失败不替换对手')
     p.add_argument('--model', help='指定 Codex 模型；省略则沿用本机 Codex 配置中的模型')
     p.add_argument('--players', type=int, default=MAX_PLAYERS, help=f'总座位数，含你，2–{MAX_PLAYERS}（默认九人满员桌）')
     p.add_argument('--stack', type=int, default=2000, help='每人初始筹码（默认 2000）')

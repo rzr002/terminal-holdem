@@ -4,6 +4,7 @@ import time
 import unicodedata
 
 from .engine import Action, HAND_NAMES, STREET_NAMES, evaluate
+from .strategy import PROFILES
 
 SUIT_GLYPHS = {'s': '♠', 'h': '♥', 'd': '♦', 'c': '♣'}
 
@@ -68,7 +69,7 @@ def frame_lines(hand, width, provider, autoplay, boss, status, height=None):
                f'    POT  {hand.pot:,}      当前下注  {hand.current_bet:,}')
     lines += [summary, '',
               '  座位 / 风格          筹码       本轮    手牌 / 动作']
-    styles = ['你  ', '稳健', '进攻', '灵活', '宽松', '均衡', '稳健', '进攻', '灵活']
+    styles = ['你  '] + [profile.style for profile in PROFILES[1:]]
     for i, p in enumerate(hand.players):
         marker = '▶' if hand.actor == i else ' '
         badges = ('D' if i == hand.button else '') + ('s' if i == hand.sb else '') + ('b' if i == hand.bb else '')

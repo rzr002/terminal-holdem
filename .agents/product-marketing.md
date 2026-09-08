@@ -1,6 +1,6 @@
 # Product Marketing Context
 
-**Document version:** v1
+**Document version:** v2
 **Last updated:** 2026-09-08
 
 根据当前代码、测试和项目需求整理。受众与使用动机是定位假设，尚无用户调研或转化数据。
@@ -29,8 +29,9 @@
 
 ## Differentiation
 
-- 默认九人桌，八个对手通过真实 `codex exec` 决策，可接管玩家座位。
-- 不同风格通过提示词表达；不承诺模型水平、胜率或 GTO 能力。
+- 默认九人桌，八个对手通过真实 `codex exec` 决策，各自加载独立 `SKILL.md`，可接管玩家座位。
+- 策略 skill 配合行动加权抽样、位置、可争夺底池与公开统计；不承诺模型水平、胜率或 GTO 能力。
+- 显式 `--agent strategic` 可使用程序启发式牌手；它尚未经过强化学习训练，不执行文字 skill。
 - Codex 失败时暂停并允许重试，不自动替换成本地机器人。
 - 进行中只向每个模型提供自身底牌与公开信息；结束后向玩家亮出所有牌供复盘。
 - B 切换终端隐藏页；小窗口可容纳九个座位。
@@ -62,8 +63,10 @@
 
 ## Proof Points
 
-- 43 项自动测试通过，包含规则、九人座位、复盘显示、子进程协议和终端交互。
+- 自动测试覆盖规则、九人座位、复盘显示、角色注入、边池权益、统计传递、子进程协议和终端交互。
 - `validation/codex-nine-seat-smoke.json`：真实九人全 AI 对局完成，18 次 Codex 动作，虚拟筹码守恒。
+- `validation/codex-strategy-smoke.json`：加载角色 skill 的三次真实 Codex 场景检查通过，只验证基础判断与接入，不能当作长期强度指标。
+- 程序牌手的基线比较保存在 `validation/strategic-benchmark*.json`；必须同时报告样本、基线与区间，不能挑选盈利样本作宣传。
 - `docs/table-preview.svg`：确定性牌局生成的界面样例，不是模型实战表现证据。
 - 客户、评价、安装量、转化率：暂无。不能编造。
 
@@ -75,6 +78,7 @@
 
 ## Changelog
 
+- v2 (2026-09-08) — 加入独立角色 skill、决策辅助、程序牌手及评测边界，避免将增强提示词或 Monte Carlo 当作训练好的强化学习模型。
 - v1 (2026-09-08) — 根据九人桌、真实 Codex 联调与全牌复盘实现建立定位、文案边界和验证依据。
 
 使用 [marketingskills](https://github.com/coreyhaines31/marketingskills) 的 `product-marketing` 与 `copywriting`，参考版本 `5b2c0007766c6a1cf1d53fd8fc73e979e0821022`。

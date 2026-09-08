@@ -1,0 +1,18 @@
+{
+  "candidate": "strategic",
+  "opponents": "legacy local / balanced",
+  "players": 9,
+  "independent_deals": 20,
+  "seat_rotations_per_deal": 9,
+  "hands": 180,
+  "samples_per_agent_decision": 64,
+  "seed": 20260908,
+  "bb_per_100": -91.5,
+  "approx_95pct_interval_bb_per_100": [
+    -326.55,
+    143.55
+  ],
+  "decisions": 2806,
+  "elapsed_seconds": 5.58,
+  "limitations": "Small synthetic benchmark versus one heuristic baseline; not a Codex benchmark, exploitability estimate, or professional-strength claim."
+}

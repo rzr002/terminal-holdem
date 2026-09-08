@@ -1,0 +1,33 @@
+{
+  "model": "gpt-6-astra",
+  "cases": [
+    {
+      "case": "early_trash",
+      "role": "nova",
+      "action": "fold",
+      "amount": 0,
+      "source": "codex",
+      "passed": true,
+      "elapsed_seconds": 12.32
+    },
+    {
+      "case": "early_aces",
+      "role": "blaze",
+      "action": "raise",
+      "amount": 25,
+      "source": "codex",
+      "passed": true,
+      "elapsed_seconds": 8.29
+    },
+    {
+      "case": "short_stack_nuts",
+      "role": "orbit",
+      "action": "call",
+      "amount": 0,
+      "source": "codex",
+      "passed": true,
+      "elapsed_seconds": 11.28
+    }
+  ],
+  "scope": "Real Codex, loaded role skills and analysis; three synthetic sanity checks, not a strength benchmark."
+}
