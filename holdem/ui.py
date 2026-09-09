@@ -186,7 +186,7 @@ class PlainUI:
         pass
 
     def after_hand(self, app, hand, finished):
-        self.render(app, hand, '本局结束' if finished else '本手结束')
+        self.render(app, hand, app.end_reason if finished else '本手结束')
         if finished or app.args.watch or app.autoplay:
             return
         try:
@@ -370,7 +370,11 @@ class CursesUI:
                 options.append('A 全押')
             self._write(height - 5, '  ' + '  /  '.join(options), 2)
         else:
-            self._write(height - 5, '  N / Enter 下一手' if hand.done else '  对手行动中；随时可隐藏或暂停')
+            if hand.done:
+                controls = 'Q / Enter 退出' if app.end_reason else 'N / Enter 下一手'
+            else:
+                controls = '对手行动中；随时可隐藏或暂停'
+            self._write(height - 5, '  ' + controls)
         note = f'加注至 > {self.raise_text}  （Enter 确认 / Esc 取消）' if self.raise_text is not None else self.notice
         if app.pending_model:
             note = f'下一次决策使用 {app.pending_model} · 等待当前决策完成'
@@ -469,9 +473,10 @@ class CursesUI:
         if (app.args.watch or app.autoplay) and not finished:
             self.wait(app, hand, max(1.5, app.args.delay * 2))
             return
-        status = '本局结束 · Q / Enter 退出' if finished else '本手结束 · N / Enter 下一手'
+        status = f'{app.end_reason} · Q / Enter 退出' if finished else '本手结束 · N / Enter 下一手'
         while True:
             self.render(app, hand, status)
             key = self._key(app)
-            if not self.boss and not self.paused and key in ('n', '\n', '\r', self.curses.KEY_ENTER):
+            if not self.boss and not self.paused and (key in ('\n', '\r', self.curses.KEY_ENTER)
+                                                     or (key == 'n' and not finished)):
                 return

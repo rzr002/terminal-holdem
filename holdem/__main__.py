@@ -34,6 +34,7 @@ class Application:
         self.hands_played = 0
         self.hand = None
         self.error = ''
+        self.end_reason = ''
         self.memory = PublicStats()
         self.agent_busy = False
         self.pending_model = None
@@ -108,7 +109,10 @@ class Application:
                 self.memory.record(h.observation(0))
                 funded = [i for i, p in enumerate(self.players) if p.stack]
                 limit = self.args.hands or (100 if self.args.headless else 0)
-                finished = len(funded) < 2 or (limit > 0 and self.hands_played >= limit)
+                player_busted = self.players[0].stack == 0
+                finished = player_busted or len(funded) < 2 or (limit > 0 and self.hands_played >= limit)
+                if finished:
+                    self.end_reason = '你的筹码已归零 · 本局结束' if player_busted else '本局结束'
                 ui.after_hand(self, h, finished)
                 if finished:
                     break
@@ -122,7 +126,7 @@ class Application:
                 'players': [{'name': p.name, 'stack': p.stack} for p in self.players],
                 'unsettled_pot': self.hand.pot if self.hand else 0,
                 'decisions': dict(self.decisions), 'agent': self.agent.label,
-                'error': self.error}
+                'error': self.error, 'end_reason': self.end_reason}
 
 
 def parser():
@@ -137,7 +141,7 @@ def parser():
     p.add_argument('--autoplay', action='store_true', help='启动时托管你的座位；T 可接管')
     p.add_argument('--plain', action='store_true', help='逐行交互，不使用 curses')
     p.add_argument('--headless', action='store_true', help='全 AI 跑局后输出 JSON；默认最多 100 手')
-    p.add_argument('--hands', type=int, default=0, help='最多玩多少手；0 表示打到只剩一人')
+    p.add_argument('--hands', type=int, default=0, help='最多玩多少手；0 表示直到你出局或只剩一人')
     p.add_argument('--seed', type=int, help='固定发牌和本地策略随机种子，便于复现')
     p.add_argument('--delay', type=float, default=0.7, help='TUI 每次行动后的停留秒数')
     p.add_argument('--timeout', type=float, default=60, help='Codex 单次决策超时秒数（默认 60）')
