@@ -27,15 +27,23 @@ python3 play.py
 
 已经下载项目并登录 Codex，直接运行 `python3 play.py` 即可。尚未安装 CLI，可参考 [Codex CLI 安装说明](https://developers.openai.com/codex/cli)。
 
-想在任意目录直接输入 **`holdem`** 开局？macOS / Linux 在项目目录执行一次：
+想在任意目录直接输入 **`holdem`** 开局？macOS / Linux 在项目目录运行安装器：
 
 ```bash
-mkdir -p "$HOME/.local/bin"
-ln -s "$PWD/play.py" "$HOME/.local/bin/holdem"
-export PATH="$HOME/.local/bin:$PATH"
+python3 install.py
 ```
 
-随后用 `holdem` 启动并选择模型，或用 `holdem --model gpt-5.3-codex-spark` 直接开局。其他参数照常使用，例如 `holdem --list-models`。若终端尚未配置 `~/.local/bin`，把上面的 `export PATH` 一行加入 `~/.zshrc`（zsh）或 `~/.bashrc`（Bash），让新终端也能找到命令。此入口指向当前项目，项目更新后立即生效；移动项目目录后需重新建立链接。
+安装器将命令放到 `~/.local/bin`，无需 sudo，可重复运行。若命令目录尚未加入 PATH，它会给出可复制的设置命令；按提示执行，并加入 `~/.zshrc`（zsh）或 `~/.bashrc`（Bash）即可。已有其他软件的同名命令时会保留原文件，支持 `--bin-dir` 指定安装目录。
+
+装好后直接使用：
+
+```bash
+holdem                                      # 开局时选择模型
+holdem --model gpt-5.3-codex-spark            # 指定模型，直接开局
+holdem --list-models                         # 查看本机模型列表
+```
+
+安装器会保留全部游戏参数，也能升级之前手动创建的本项目快捷链接。`git pull` 更新项目后，命令会运行最新代码；移动项目目录或更换 Python 环境后，重新运行 `python3 install.py` 更新入口即可。
 
 默认是 **九人满员桌：你 + 8 位 Codex 模型对手**，每人 2,000 筹码，盲注 10/20。可用 `--players 2` 到 `--players 9` 调整人数。推荐终端窗口为 **100 列 × 36 行**，最低 72 × 24；小窗口会自动切换紧凑布局，九个座位都可见。
 
