@@ -27,6 +27,16 @@ python3 play.py
 
 已经下载项目并登录 Codex，直接运行 `python3 play.py` 即可。尚未安装 CLI，可参考 [Codex CLI 安装说明](https://developers.openai.com/codex/cli)。
 
+想在任意目录直接输入 **`holdem`** 开局？macOS / Linux 在项目目录执行一次：
+
+```bash
+mkdir -p "$HOME/.local/bin"
+ln -s "$PWD/play.py" "$HOME/.local/bin/holdem"
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+随后用 `holdem` 启动并选择模型，或用 `holdem --model gpt-5.3-codex-spark` 直接开局。其他参数照常使用，例如 `holdem --list-models`。若终端尚未配置 `~/.local/bin`，把上面的 `export PATH` 一行加入 `~/.zshrc`（zsh）或 `~/.bashrc`（Bash），让新终端也能找到命令。此入口指向当前项目，项目更新后立即生效；移动项目目录后需重新建立链接。
+
 默认是 **九人满员桌：你 + 8 位 Codex 模型对手**，每人 2,000 筹码，盲注 10/20。可用 `--players 2` 到 `--players 9` 调整人数。推荐终端窗口为 **100 列 × 36 行**，最低 72 × 24；小窗口会自动切换紧凑布局，九个座位都可见。
 
 默认采用**先看翻牌**桌风，顶部显示「先看翻牌」：普通 100 BB 深度下，翻前累计下注不超过 6 BB（默认 120 筹码）时，自动牌手连 72o 这样的弱牌也会继续，看到三张公共牌再判断。未开池最多加到 3 BB，已有加注就平跟，避免对手之间连续抬价。
