@@ -1,61 +1,56 @@
 # ♠ Terminal Hold’em
 
-**在终端里，和 8 位 Codex 对手打德州扑克。**
+**在终端里，和 5 位 Lucas v16 对手打标准无限注德州扑克。**
 
-休息时开一桌，自己出牌，也可以按 T 让 Codex 接管。每手结束，所有人的底牌一起亮出来，看看刚才谁在诈唬。仅使用虚拟筹码。
-
-[开始第一手](#开始第一手) · [操作按键](#操作) · [运行测试](#规则与测试)
-
-![九人桌结束后的复盘界面，所有底牌公开，未参与结算的河牌标记星号](docs/table-preview.svg)
-
-*界面样例：转牌时其余玩家弃牌，最后一张公共牌补出供复盘，标记 `*`。示例由固定牌局生成。*
-
-- **和模型同桌。** 八位对手由真实 Codex CLI 决策，各自加载独立策略 skill，结合赔率、行动加权抽样和公开统计；连接失败时暂停，可重试。
-- **随时交接。** 自己玩、托管自己，或观看整桌 AI 对战；B 可立即切到终端隐藏页。
-- **结束后看清每张牌。** 弃牌也亮底牌，提前结束也可看到剩余公共牌的复盘补牌。
-
-Python 3.11+，无第三方 Python 依赖。需要本机安装并登录 Codex CLI。macOS / Linux 默认使用 `curses` 全屏界面；不支持 curses 的环境可用 `--plain`。
+默认六人桌：你 + 5 个独立 Lucas 牌手，每人 2,000 筹码，盲注 10/20（100 BB）。本地 CPU 决策，不需要 Codex、API 或 GPU。保留原来的全屏/逐行界面、托管、观战、结束后亮牌复盘；仅使用虚拟筹码。
 
 ## 开始第一手
 
-```bash
-git clone https://github.com/rzr002/terminal-holdem.git
-cd terminal-holdem
-codex login
-python3 play.py
-```
-
-已经下载项目并登录 Codex，直接运行 `python3 play.py` 即可。尚未安装 CLI，可参考 [Codex CLI 安装说明](https://developers.openai.com/codex/cli)。
-
-想在任意目录直接输入 **`holdem`** 开局？macOS / Linux 在项目目录运行安装器：
+Python 3.11+。在项目目录创建隔离环境并安装 Lucas 的胜率计算依赖：
 
 ```bash
-python3 install.py
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-lucas.txt
+.venv/bin/python play.py
+.venv/bin/python install.py
 ```
 
-安装器将命令放到 `~/.local/bin`，无需 sudo，可重复运行。若命令目录尚未加入 PATH，它会给出可复制的设置命令；按提示执行，并加入 `~/.zshrc`（zsh）或 `~/.bashrc`（Bash）即可。已有其他软件的同名命令时会保留原文件，支持 `--bin-dir` 指定安装目录。
-
-装好后直接使用：
+装好快捷命令后，在任意目录输入：
 
 ```bash
-holdem                                      # 开局时选择模型
-holdem --model gpt-5.3-codex-spark            # 指定模型，直接开局
-holdem --list-models                         # 查看本机模型列表
+holdem                                      # 你 + 5 位 Lucas v16
+holdem --plain                              # 逐行模式
+holdem --autoplay                           # 托管你的座位，T 接管
+holdem --watch --hands 10                   # 全 AI 观战
+holdem --agent codex                        # 原有九人 Codex 模式
+holdem --model gpt-5.4-mini                  # 指定模型时自动选择 Codex
+holdem --list-models                        # 查看本机 Codex 模型列表
 ```
 
-安装器会保留全部游戏参数，也能升级之前手动创建的本项目快捷链接。`git pull` 更新项目后，命令会运行最新代码；移动项目目录或更换 Python 环境后，重新运行 `python3 install.py` 更新入口即可。
+推荐终端大小 100 列 × 36 行，最低 72 × 24。`F` 弃牌、`C` 跟注/过牌、`R` 加注至总额、`A` 全押、`Q` 退出。`--players 2` 到 `--players 9` 可调整人数，Lucas 默认 6，其他模式保留默认 9。
 
-默认是 **九人满员桌：你 + 8 位 Codex 模型对手**，每人 2,000 筹码，盲注 10/20。可用 `--players 2` 到 `--players 9` 调整人数。推荐终端窗口为 **100 列 × 36 行**，最低 72 × 24；小窗口会自动切换紧凑布局，九个座位都可见。
+如果 macOS / Python 3.13 没有匹配的 eval7 wheel，需要本机 C 编译器，在虚拟环境先安装构建依赖再编译：
 
-默认采用**先看翻牌**桌风，顶部显示「先看翻牌」：普通 100 BB 深度下，翻前累计下注不超过 6 BB（默认 120 筹码）时，自动牌手连 72o 这样的弱牌也会继续，看到三张公共牌再判断。未开池最多加到 3 BB，已有加注就平跟，避免对手之间连续抬价。
+```bash
+.venv/bin/python -m pip install Cython setuptools wheel
+.venv/bin/python -m pip install --no-build-isolation -r requirements-lucas.txt
+```
 
-这个偏好通过 Codex 的可选动作和输出 schema 生效，模型仍实际选择跟注、过牌或小加注，程序不会把它的弃牌改写成跟注。手动玩家照常出牌。有效筹码不足 20 BB、整轮成本超过有效筹码 12%、跟注会耗尽筹码或面对主动全押时，恢复完整判断；翻牌发出后也恢复正常策略。反复全押的公开统计与防守调整继续保留。
+安装器更新 `~/.local/bin/holdem`，会记住运行安装器的 Python 路径；不会覆盖其他软件的同名命令。项目移动或虚拟环境更换后重新运行安装器即可。
 
-本轮[真实 Codex 整桌验证](validation/codex-flop-first-smoke.json)：9 次决策、首轮零弃牌，9 人都进入翻牌，耗时约 80 秒。这是普通初始筹码下的一桌实测，面对高额下注或全押时人数仍由决策决定。
+## Lucas v16 陪练
 
-模型行动会使用你已有 Codex 账户的额度，需要等待响应。一次九人短筹码实测完成 18 次决策、耗时约 169 秒，实际时间随模型、网络和行动次数变化。
+接入 [Lucas 的开源 Fullhouse 牌手](https://github.com/lucashsu007-create/fullhouse-hackathon-write-up-repo)，使用 `v16_squeeze_C_metacap`。原始策略源码与 MIT 许可证保存在 `holdem/vendor/lucas_v16/`，固定提交和校验值见该目录 README。它是位置范围、蒙特卡洛胜率计算和策略规则构成的程序牌手，没有需要下载的神经网络权重；本次接入不代表完成职业级胜率验证。
+
+界面显示 **标准德州 · LUCAS v16 / 本地**。Lucas 可以正常翻前弃牌、加注、全押，不施加原 Codex 模式的“先看翻牌”限制。五个对手使用同一套策略，但底牌和公开行为统计各自隔离，不共享私牌。有人出局后自动压缩位置编号，保持位置表有效。
+
+适配器将本地筹码换算成大盲 100 的上游单位，再将加注总额换回实际筹码；按本地规则处理短筹码全押和未重新开放的加注权。它只接收本座位底牌、已发公共牌、公开下注记录及合法动作，不接收其他底牌、牌堆或发牌随机种子。每手结束补齐公开行动统计，复盘揭示的其他底牌不会用于学习。
+
+依赖缺失或适配错误时暂停牌局并报错，不换成 Codex 或旧本地策略。`--seed` 固定发牌；上游部分胜率抽样有时间预算，因此 Lucas 的所有决策不保证跨机器逐次一致。
 
 ## 使用 Codex 牌手
+
+此模式保留原来的九人桌和“先看翻牌”偏好；普通 100 BB 深度下，自动牌手尽量跟小注看翻牌。Lucas 模式不使用该限制。
 
 先安装并登录本机 Codex CLI，然后运行：
 
@@ -95,7 +90,7 @@ python3 play.py --check-codex --model gpt-5.4-mini
 
 Codex 与本地策略都只接收该座位的底牌、公共牌、公开下注记录及合法动作；不接收其他底牌、剩余牌堆或发牌随机种子。对手的决策理由也不会写进你能看到的行动记录。
 
-## 对手策略
+## Codex 对手策略
 
 | 对手 | 策略侧重 |
 | --- | --- |
@@ -126,7 +121,7 @@ Codex 与本地策略都只接收该座位的底牌、公共牌、公开下注�
 python3 play.py --agent strategic
 ```
 
-它用位置范围、行动加权抽样和下注规则出牌，界面明确显示 `STRATEGIC / 程序策略`。默认仍使用 Codex。
+它用位置范围、行动加权抽样和下注规则出牌，界面明确显示 `STRATEGIC / 程序策略`。默认使用 Lucas v16；此模式须显式选择。
 
 ## 操作
 
@@ -134,7 +129,7 @@ python3 play.py --agent strategic
 | --- | --- |
 | `F` | 弃牌 |
 | `C` | 无人下注时过牌，否则跟注 |
-| `R` | 输入本轮下注**总额**，Enter 确认，Esc 取消；连接失败时重试 Codex |
+| `R` | 输入本轮下注**总额**，Enter 确认，Esc 取消；决策失败时重试当前牌手 |
 | `A` | 全押；仅在规则允许时可用 |
 | `T` | 开关你的 AI 托管；关闭后在当前决策完成时交还控制 |
 | `M` | 选择 Codex 模型；当前请求完成后，后续决策使用新模型 |
@@ -163,9 +158,9 @@ python3 play.py --agent codex --autoplay
 python3 play.py --agent codex --watch --hands 10
 
 # Codex 六人桌
-python3 play.py --players 6 --stack 1000 --big-blind 10
+python3 play.py --agent codex --players 6 --stack 1000 --big-blind 10
 
-# Codex 自动跑局并输出 JSON，不显示牌桌
+# Lucas 自动跑局并输出 JSON，不显示牌桌
 python3 play.py --headless --hands 1 --seed 42
 
 # 兼容不支持全屏界面的终端
@@ -185,10 +180,10 @@ python3 play.py --plain
 仅为离线开发测试保留显式的 `--agent local`：它采用随机抽样策略，不是 Codex 模型。游戏不会自行选择这个模式。
 
 ```bash
-python3 -m unittest discover -s tests -v
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
-测试覆盖牌型、九人桌行动顺序、加注权限、边池与平分、短盲注、筹码守恒、进行中隐藏信息、结束后全部亮牌、复盘补牌不改变结算、小窗口九个座位可见、真实子进程协议、系统代理传递、默认使用 Codex、失败时不替换对手、超时和取消、输入校验及完整自动对局。测试不会调用付费模型；真实连接单独使用 `--check-codex` 检查。
+测试覆盖牌型、九人桌行动顺序、加注权限、边池与平分、短盲注、筹码守恒、进行中隐藏信息、结束后全部亮牌、复盘补牌不改变结算、小窗口九个座位可见、真实子进程协议、系统代理传递、默认六人 Lucas、独立座位统计与位置映射、真实 eval7 计算、失败时不替换对手、超时和取消、输入校验及完整自动对局。测试不会调用付费模型；真实连接单独使用 `--check-codex` 检查。
 
 2026-09-08 已完成真实联调：使用本机配置的 `gpt-6-astra` 和系统代理跑完一手九人全 AI 对局，18 次动作全部来自 Codex，耗时约 169 秒，筹码结算守恒，无本地策略参与。记录见 [validation/codex-nine-seat-smoke.json](validation/codex-nine-seat-smoke.json)；早期四人桌验证保留在 [validation/codex-smoke.json](validation/codex-smoke.json)。
 

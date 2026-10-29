@@ -84,6 +84,7 @@ class Hand:
         self.board, self.history, self.results = [], [], []
         self.review_board = []
         self.action_history = []
+        self.blind_posts = []
         self.street = 'preflop'
         self.done = self.showdown = False
         self.actor = None
@@ -107,6 +108,8 @@ class Hand:
                 players[i].hole.append(self.deck.pop())
         for i, amount, label in [(self.sb, small_blind, '小盲'), (self.bb, big_blind, '大盲')]:
             self._pay(i, min(amount, players[i].stack))
+            self.blind_posts.append({'seat': i, 'action': 'small_blind' if i == self.sb else 'big_blind',
+                                     'amount': players[i].bet})
             players[i].last_action = label
             self.history.append(f'{players[i].name} {label} {players[i].bet}')
         self.pending = set(self.capable())
@@ -294,4 +297,5 @@ class Hand:
                              'committed': p.committed, 'folded': p.folded, 'dealt_in': bool(p.hole)}
                             for i, p in enumerate(self.players)],
                 'legal': self.legal() if seat == self.actor else {'actions': []},
-                'history': self.history.copy(), 'action_history': [event.copy() for event in self.action_history]}
+                'history': self.history.copy(), 'action_history': [event.copy() for event in self.action_history],
+                'blind_posts': [event.copy() for event in self.blind_posts]}

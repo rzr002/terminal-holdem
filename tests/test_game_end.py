@@ -28,7 +28,7 @@ class RecordingUI(HeadlessUI):
 class GameEndTests(unittest.TestCase):
     def play(self, *mode, seed=2, short_seat=0):
         app = Application(parser().parse_args([
-            '--players', '3', '--stack', '100', '--seed', str(seed), '--hands', '2',
+            '--agent', 'codex', '--players', '3', '--stack', '100', '--seed', str(seed), '--hands', '2',
             '--delay', '0', *mode]))
         app.players[short_seat].stack = 10
         app.agent.missing_binary = False

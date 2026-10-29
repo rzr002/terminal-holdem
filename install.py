@@ -62,7 +62,7 @@ def main(argv=None):
         print('当前终端还需执行：')
         print(f'export PATH={shlex.quote(str(launcher.parent))}:"$PATH"')
         print('把这行加入 ~/.zshrc（zsh）或 ~/.bashrc（Bash），新终端也能使用。')
-    print('启动：holdem\n指定模型：holdem --model gpt-5.3-codex-spark')
+    print('启动六人 Lucas 陪练：holdem\n原 Codex 模式：holdem --agent codex\n指定 Codex 模型：holdem --model gpt-5.4-mini')
     print('项目移动或 Python 环境更换后，重新运行 python3 install.py 即可更新入口。')
     return 0
 

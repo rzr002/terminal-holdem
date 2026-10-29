@@ -107,6 +107,9 @@ class Application:
                     ui.wait(self, h, self.args.delay)
                 self.hands_played += 1
                 self.memory.record(h.observation(0))
+                for seat, player in enumerate(self.players):
+                    if player.hole:
+                        self.agent.observe(h.observation(seat))
                 funded = [i for i, p in enumerate(self.players) if p.stack]
                 limit = self.args.hands or (100 if self.args.headless else 0)
                 player_busted = self.players[0].stack == 0
@@ -129,12 +132,22 @@ class Application:
                 'error': self.error, 'end_reason': self.end_reason}
 
 
+class GameParser(argparse.ArgumentParser):
+    def parse_args(self, args=None, namespace=None):
+        args = super().parse_args(args, namespace)
+        if args.agent is None:
+            args.agent = 'codex' if args.model or args.check_codex else 'lucas'
+        if args.players is None:
+            args.players = 6 if args.agent == 'lucas' else MAX_PLAYERS
+        return args
+
+
 def parser():
-    p = argparse.ArgumentParser(description='终端德州扑克 · Codex 牌手 / 本地策略 · 纯虚拟筹码')
-    p.add_argument('--agent', choices=['codex', 'strategic', 'local', 'auto'], default='codex', help='默认 Codex + 角色技能；strategic 为程序策略；local 为旧测试策略。失败不替换对手')
+    p = GameParser(description='终端德州扑克 · Lucas v16 六人陪练 / Codex 牌手 · 纯虚拟筹码')
+    p.add_argument('--agent', choices=['lucas', 'codex', 'strategic', 'local', 'auto'], help='默认 Lucas v16 本地六人桌；codex 使用模型；strategic/local 为旧程序策略。失败不替换对手')
     p.add_argument('--model', type=validate_model, help='指定 Codex 模型并跳过启动菜单；非交互运行省略时沿用 Codex 配置')
     p.add_argument('--list-models', action='store_true', help='列出本机 Codex 缓存中的模型后退出')
-    p.add_argument('--players', type=int, default=MAX_PLAYERS, help=f'总座位数，含你，2–{MAX_PLAYERS}（默认九人满员桌）')
+    p.add_argument('--players', type=int, help=f'总座位数，含你，2–{MAX_PLAYERS}（Lucas 默认 6，其他模式默认 9）')
     p.add_argument('--stack', type=int, default=2000, help='每人初始筹码（默认 2000）')
     p.add_argument('--big-blind', type=int, default=20, help='大盲注（默认 20，小盲为其一半取整）')
     p.add_argument('--watch', action='store_true', help='全 AI 观战，包含你的座位')
@@ -199,7 +212,7 @@ def main(argv=None):
             return 1
     if result['error']:
         if not args.headless:
-            print(f"Codex 未完成决策，牌局已停止：{result['error']}", file=sys.stderr)
+            print(f"牌手未完成决策，牌局已停止：{result['error']}", file=sys.stderr)
         return 1
     return 0
 

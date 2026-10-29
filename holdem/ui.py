@@ -54,7 +54,7 @@ def frame_lines(hand, width, provider, autoplay, boss, status, height=None):
                 'Waiting for events...']
     rule = '─' * max(0, min(width - 4, 100))
     mode = 'AI 托管' if autoplay else '手动玩家'
-    table_style = '基线桌' if provider == 'LOCAL' else '先看翻牌'
+    table_style = '标准德州' if provider.startswith('LUCAS') else ('基线桌' if provider == 'LOCAL' else '先看翻牌')
     lines = ['  ♠  HOLD’EM     /     AFTER HOURS',
              f'  {len(hand.players)} 人桌 · {table_style} · {provider} · {mode}', '  ' + rule,
              f'  HAND {hand.number:03d}     {STREET_NAMES[hand.street]}     盲注 {hand.small_blind}/{hand.big_blind}', '']
@@ -72,6 +72,8 @@ def frame_lines(hand, width, provider, autoplay, boss, status, height=None):
     lines += [summary, '',
               '  座位 / 风格          筹码       本轮    手牌 / 动作']
     styles = ['你  '] + [profile.style for profile in PROFILES[1:]]
+    if provider.startswith('LUCAS'):
+        styles = ['你  '] + ['Lucas v16'] * (len(hand.players) - 1)
     for i, p in enumerate(hand.players):
         marker = '▶' if hand.actor == i else ' '
         badges = ('D' if i == hand.button else '') + ('s' if i == hand.sb else '') + ('b' if i == hand.bb else '')
@@ -140,9 +142,11 @@ class PlainUI:
         print(app.request_model(model))
 
     def agent_error(self, app, hand, message):
-        print(f'Codex 未完成决策：{message}。当前行动保持不变。')
+        provider = 'Codex' if app.agent.codex else app.agent.label
+        print(f'{provider} 未完成决策：{message}。当前行动保持不变。')
         try:
-            command = input('R 重试 Codex / M 换模型并重试 / Q 退出 > ').strip().lower()
+            prompt = 'R 重试 Codex / M 换模型并重试 / Q 退出 > ' if app.agent.codex else 'R 重试 / Q 退出 > '
+            command = input(prompt).strip().lower()
             if command == 'm':
                 self.change_model(app)
                 return True
@@ -217,12 +221,12 @@ class HeadlessUI(PlainUI):
 
 class CursesUI:
     def agent_error(self, app, hand, message):
-        self.notice = 'M 换模型后按 R 重试 / Q 退出'
+        self.notice = 'M 换模型后按 R 重试 / Q 退出' if app.agent.codex else 'R 重试 / Q 退出'
         while True:
-            self.render(app, hand, 'Codex 未完成决策 · 牌局暂停')
+            self.render(app, hand, '牌手未完成决策 · 牌局暂停')
             key = self._key(app)
             if not self.boss and not self.paused and key == 'r':
-                self.notice = '正在重试 Codex'
+                self.notice = '正在重试'
                 return True
 
     def __init__(self, screen):
@@ -359,7 +363,7 @@ class CursesUI:
         self._write(height - 6, '  ' + status, 2, True)
         legal = hand.legal()
         if app.error:
-            self._write(height - 5, '  R 重试 Codex / M 换模型 / Q 退出', 2)
+            self._write(height - 5, '  R 重试 Codex / M 换模型 / Q 退出' if app.agent.codex else '  R 重试 / Q 退出', 2)
         elif hand.actor == 0 and not hand.done:
             actions = legal['actions']
             call = f"C 跟注 {legal['to_call']}" if legal['to_call'] else 'C 过牌'

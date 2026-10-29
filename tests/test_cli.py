@@ -15,8 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CLITests(unittest.TestCase):
-    def test_default_opponents_are_codex(self):
-        self.assertEqual(parser().parse_args([]).agent, 'codex')
+    def test_default_opponents_are_lucas(self):
+        self.assertEqual(parser().parse_args([]).agent, 'lucas')
 
     def test_list_models_exits_without_starting_game_or_requesting_codex(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -30,7 +30,7 @@ class CLITests(unittest.TestCase):
         self.assertNotIn('HOLD', result.stdout)
 
     def test_default_table_has_player_and_eight_codex_opponents(self):
-        args = parser().parse_args([])
+        args = parser().parse_args(['--agent', 'codex'])
         self.assertEqual(args.players, 9)
         app = Application(args)
         self.assertEqual(len(app.players), 9)
@@ -42,7 +42,7 @@ class CLITests(unittest.TestCase):
             def agent_error(self, app, hand, message):
                 return True
 
-        app = Application(parser().parse_args(['--headless', '--players', '2', '--hands', '1']))
+        app = Application(parser().parse_args(['--agent', 'codex', '--headless', '--players', '2', '--hands', '1']))
         app.agent.missing_binary = False
         with patch.object(app.agent.codex, 'decide', side_effect=[TimeoutError('temporary connection error'),
                                                                Decision(Action('fold'), 'codex')]) as decide:
@@ -54,7 +54,7 @@ class CLITests(unittest.TestCase):
         self.assertEqual(result['hands_played'], 1)
 
     def test_next_hand_receives_public_stats_and_specific_role(self):
-        app = Application(parser().parse_args(['--headless', '--hands', '2']))
+        app = Application(parser().parse_args(['--agent', 'codex', '--headless', '--hands', '2']))
         app.agent.missing_binary = False
         with patch.object(app.agent.codex, 'decide', return_value=Decision(Action('fold'), 'codex')) as decide:
             result = app.run(HeadlessUI())
@@ -74,7 +74,7 @@ class CLITests(unittest.TestCase):
             binary.write_text(f'#!{sys.executable}\nraise SystemExit(7)\n')
             binary.chmod(0o755)
             env = dict(os.environ, PATH=folder + os.pathsep + os.environ['PATH'])
-            result = subprocess.run([sys.executable, '-m', 'holdem', '--headless', '--hands', '1'],
+            result = subprocess.run([sys.executable, '-m', 'holdem', '--agent', 'codex', '--headless', '--hands', '1'],
                                     cwd=ROOT, env=env, capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 1, result.stderr)
             data = json.loads(result.stdout)

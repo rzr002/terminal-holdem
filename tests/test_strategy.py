@@ -231,10 +231,10 @@ class StrategyTests(unittest.TestCase):
             decision = agents.StrategicAgent(random.Random(3), samples=64).decide(obs, profile.key)
             self.assertIn(decision.action.kind, ['call', 'allin'])
 
-    def test_program_provider_is_explicit_and_codex_remains_default(self):
+    def test_program_provider_is_explicit_and_lucas_is_default(self):
         from holdem.__main__ import Application, parser
         self.assertIn('strategic', parser()._option_string_actions['--agent'].choices)
-        self.assertEqual(parser().parse_args([]).agent, 'codex')
+        self.assertEqual(parser().parse_args([]).agent, 'lucas')
         app = Application(parser().parse_args(['--agent', 'strategic']))
         self.assertIsNone(app.agent.codex)
         self.assertIn('STRATEGIC', app.agent.label)

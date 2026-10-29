@@ -286,7 +286,11 @@ class ResilientAgent:
     """Select an explicitly requested provider. Never substitute another provider."""
 
     def __init__(self, mode='codex', binary=None, model=None, timeout=60, rng=None):
+        self.mode = mode
         self.local = LocalAgent(rng) if mode == 'local' else (StrategicAgent(rng) if mode == 'strategic' else None)
+        if mode == 'lucas':
+            from .lucas import LucasAgent
+            self.local = LucasAgent()
         self.codex = None if self.local else CodexAgent(binary, model, timeout, rng)
         self.missing_binary = self.codex is not None and binary is None and not shutil.which('codex')
         self.failure = ''
@@ -297,7 +301,13 @@ class ResilientAgent:
             return 'CODEX / 连接失败'
         if self.codex:
             return f'CODEX / {self.codex.model or "CLI 默认模型"}'
+        if self.mode == 'lucas':
+            return 'LUCAS v16 / 本地'
         return 'STRATEGIC / 程序策略' if isinstance(self.local, StrategicAgent) else 'LOCAL'
+
+    def observe(self, obs):
+        if hasattr(self.local, 'observe'):
+            self.local.observe(obs)
 
     def decide(self, obs, personality='balanced', cancel=None):
         if self.local:

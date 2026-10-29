@@ -1,0 +1,2 @@
+# Lucas's compiled equity evaluator; Codex/local modes do not require this.
+eval7==0.1.10
